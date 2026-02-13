@@ -64,7 +64,7 @@ The extension now includes a **high-fidelity Markdown preview system** with auth
 - **🎨 Pixel-Perfect Rendering**: Uses real CSS from mkdocs-material repository (v9.6.15) for authentic visual output
 - **📝 Advanced Admonitions**: Full support for 8 admonition types with proper Material Design colors and icons
   - `!!! note "Note Title"` - Blue informational blocks
-  - `!!! tip "Tip Title"` - Green helpful suggestions  
+  - `!!! tip "Tip Title"` - Green helpful suggestions
   - `!!! warning "Warning Title"` - Orange cautionary blocks
   - `!!! danger "Danger Title"` - Red critical alerts
   - `!!! success "Success Title"` - Green success indicators
@@ -112,7 +112,7 @@ Enhanced support for **Material for MkDocs** format conversion with **CommonMark
 
 ### 🔄 UNIQUE FEATURE: Metadata synchronization!
 
-> `Labels`, `Properties`, `PageId`, and `ParentId` are always kept up-to-date between the local file and the remote page on Confluence.  
+> `Labels`, `Properties`, `PageId`, and `ParentId` are always kept up-to-date between the local file and the remote page on Confluence.
 > **Any changes made locally (or in Confluence) are transparently reflected, avoiding inconsistencies and facilitating version control and organization of your documents.**
 
 > **Important Note:** To ensure metadata synchronization, you need to use the "Sync with Published on Confluence" command. This command will compare and synchronize all metadata between your local file and the remote page, allowing you to choose which version to keep. Without using this command, metadata changes made in Confluence won't be automatically reflected in your local file.
@@ -172,6 +172,8 @@ This extension adds the following settings to VSCode:
 | `confluenceSmartPublisher.baseUrl`               | Base URL of your Confluence instance (e.g., https://company.atlassian.net/wiki)              |
 | `confluenceSmartPublisher.username`              | Confluence username (usually email)                                                          |
 | `confluenceSmartPublisher.apiToken`              | Confluence API Token                                                                         |
+| `confluenceSmartPublisher.useBearerAuth`         | Use Bearer token authentication instead of Basic authentication. When enabled, the API Token is sent as a Bearer token and the username is not required (default: false) |
+| `confluenceSmartPublisher.confluenceVersion`     | Choose the Confluence deployment type: `cloud` (default) or `server`. Cloud uses v2 API, Server uses v1 REST API |
 | `confluenceSmartPublisher.format.numberChapters` | Automatically numbers chapters when formatting the `.confluence` document (default: true)    |
 | `confluenceSmartPublisher.htmlEntitiesDecode`    | Activates automatic conversion of HTML entities to special characters when downloading pages (default: false) |
 | `confluenceSmartPublisher.mathRenderer`          | Choose the mathematical renderer for formula blocks based on where the markdown will be viewed (default: katex) |
@@ -234,8 +236,6 @@ Example:
 ## 🚧 Known Issues
 
 - The format of `.confluence` files must strictly follow the expected structure, otherwise publication may fail.
-- Only Confluence Cloud (Atlassian) is supported. There is no support for Confluence Server/Data Center.
-- There is no support for password authentication, only API Token.
 - Pages with very large attachments may experience slowness during download or synchronization.
 - Special characters in file names can cause attachment problems.
 

@@ -2,6 +2,11 @@
 
 All notable changes to the "confluence-smart-publisher" extension will be documented in this file.
 
+## [0.4.4] - 2026-02-13
+### Technical Enhancements
+- Support Bearer token as alternative to Basic authentication
+- Add Confluence Server/Data Center support with a dropdown config to toggle between Cloud and Server
+
 ## [0.4.3] - 2025-07-29
 ### MAJOR: Custom Admonition Implementation
 - **🔧 Replaced External Dependency**: Removed `markdown-it-admonition` dependency and implemented custom admonition plugin
@@ -103,11 +108,11 @@ These changes aim to improve the presentation and readability of the generated m
 - **📋 Assets Documentation**: Complete guide for Material for MkDocs CSS extraction and integration
 
 ### Files Added/Modified
-- **New Files**: 
+- **New Files**:
   - `src/preview/MarkdownRenderer.ts` - Core markdown rendering with Material styling
   - `src/preview/PreviewPanel.ts` - WebviewPanel lifecycle management
   - `assets/css/material.css` - Main mkdocs-material SCSS file (91 lines)
-  - `assets/css/palette.scss` - Color palette definitions (41 lines)  
+  - `assets/css/palette.scss` - Color palette definitions (41 lines)
   - `assets/css/admonitions.scss` - Admonition styling (196 lines)
   - `MATERIAL_CSS_GUIDE.md` - CSS integration guide
   - `test-case.md` - Comprehensive test document

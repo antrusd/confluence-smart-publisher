@@ -4,14 +4,14 @@ import { isAbsolute, join, dirname, basename, extname } from 'path';
 import FormData = require('form-data');
 import { decodeHtmlEntities } from './confluenceFormatter';
 import { AdfToMarkdownConverter } from './adf-md-converter/adf-to-md-converter';
-import { 
-    createJSONCSPBlock, 
-    extractProperties, 
-    extractParentId, 
-    extractLabels, 
-    extractFileId, 
-    createXMLCSPBlock, 
-    createDefaultCSPProperties 
+import {
+    createJSONCSPBlock,
+    extractProperties,
+    extractParentId,
+    extractLabels,
+    extractFileId,
+    createXMLCSPBlock,
+    createDefaultCSPProperties
 } from './csp-utils';
 
 export enum BodyFormat {
@@ -28,6 +28,8 @@ export class ConfluenceClient {
     private baseUrl: string;
     private username: string;
     private apiToken: string;
+    private useBearerAuth: boolean;
+    private confluenceVersion: 'cloud' | 'server';
 
     constructor() {
         // Preferencialmente, use as configurações do VSCode para armazenar as credenciais
@@ -35,39 +37,99 @@ export class ConfluenceClient {
         this.baseUrl = (config.get('baseUrl') as string)?.replace(/\/$/, '') || '';
         this.username = config.get('username') as string || '';
         this.apiToken = config.get('apiToken') as string || '';
-        if (!this.baseUrl || !this.username || !this.apiToken) {
-            throw new Error('Configure baseUrl, username and apiToken in the extension settings.');
+        this.useBearerAuth = config.get('useBearerAuth') as boolean || false;
+        this.confluenceVersion = (config.get('confluenceVersion') as string || 'cloud') as 'cloud' | 'server';
+        if (!this.baseUrl || !this.apiToken) {
+            throw new Error('Configure baseUrl and apiToken in the extension settings.');
+        }
+        if (!this.useBearerAuth && !this.username) {
+            throw new Error('Configure username in the extension settings (required for Basic authentication).');
         }
     }
 
+    private isServer(): boolean {
+        return this.confluenceVersion === 'server';
+    }
+
     private getAuthHeader() {
+        if (this.useBearerAuth) {
+            return { 'Authorization': `Bearer ${this.apiToken}` };
+        }
         const token = Buffer.from(`${this.username}:${this.apiToken}`).toString('base64');
         return { 'Authorization': `Basic ${token}` };
     }
 
+    /**
+     * Returns the base URL for v1 REST API calls.
+     * For Cloud: strips /api/v2 suffix if present.
+     * For Server: uses baseUrl as-is (already points to the instance root).
+     */
+    private getBaseUrlV1(): string {
+        if (this.isServer()) {
+            return this.baseUrl;
+        }
+        return this.baseUrl.includes('/api/v2') ? this.baseUrl.split('/api/v2')[0] : this.baseUrl;
+    }
+
+    /**
+     * Normalizes page response to a consistent format regardless of API version.
+     * Cloud v2 API returns: { id, title, spaceId, parentId, body, version }
+     * Server v1 API returns: { id, title, space: { key, id }, ancestors: [...], body, version }
+     * This method adds spaceId and parentId fields to Server responses for compatibility.
+     */
+    private normalizePageResponse(page: any): any {
+        if (!page || !this.isServer()) {
+            return page;
+        }
+        // Normalize spaceId: Server uses space.id or space.key
+        if (!page.spaceId && page.space) {
+            page.spaceId = page.space.id || page.space.key;
+        }
+        // Normalize parentId: Server uses ancestors array
+        if (!page.parentId && Array.isArray(page.ancestors) && page.ancestors.length > 0) {
+            page.parentId = page.ancestors[page.ancestors.length - 1].id;
+        }
+        return page;
+    }
+
     async getPageByTitle(spaceKey: string, title: string): Promise<any | null> {
         const { default: fetch } = await import('node-fetch');
-        const url = `${this.baseUrl}/api/v2/pages?spaceKey=${encodeURIComponent(spaceKey)}&title=${encodeURIComponent(title)}&expand=body.${BodyFormat.STORAGE},version,space`;
+        let url: string;
+        if (this.isServer()) {
+            url = `${this.baseUrl}/rest/api/content?spaceKey=${encodeURIComponent(spaceKey)}&title=${encodeURIComponent(title)}&expand=body.${BodyFormat.STORAGE},version,space,ancestors`;
+        } else {
+            url = `${this.baseUrl}/api/v2/pages?spaceKey=${encodeURIComponent(spaceKey)}&title=${encodeURIComponent(title)}&expand=body.${BodyFormat.STORAGE},version,space`;
+        }
         const resp = await fetch(url, { headers: { ...this.getAuthHeader(), 'Content-Type': 'application/json' } });
         if (!resp.ok) {throw new Error(await resp.text());}
         const data = await resp.json() as any;
-        return data.results?.[0] || null;
+        const page = data.results?.[0] || null;
+        return this.normalizePageResponse(page);
     }
 
     async getPageById(pageId: string, bodyFormat: BodyFormat = BodyFormat.ATLAS_DOC_FORMAT): Promise<any | null> {
         const { default: fetch } = await import('node-fetch');
-        const url = `${this.baseUrl}/api/v2/pages/${pageId}?body-format=${bodyFormat}`;
+        let url: string;
+        if (this.isServer()) {
+            // Server v1 API uses expand parameter for body format
+            const serverBodyFormat = bodyFormat === BodyFormat.ATLAS_DOC_FORMAT ? BodyFormat.STORAGE : bodyFormat;
+            url = `${this.baseUrl}/rest/api/content/${pageId}?expand=body.${serverBodyFormat},version,space,ancestors`;
+        } else {
+            url = `${this.baseUrl}/api/v2/pages/${pageId}?body-format=${bodyFormat}`;
+        }
         const resp = await fetch(url, { headers: { ...this.getAuthHeader(), 'Content-Type': 'application/json' } });
         if (resp.status === 404) {return null;}
         if (!resp.ok) {throw new Error(await resp.text());}
-        return await resp.json() as any;
+        const page = await resp.json() as any;
+        return this.normalizePageResponse(page);
     }
 
     async downloadConfluencePage(pageId: string, bodyFormat: BodyFormat = BodyFormat.ATLAS_DOC_FORMAT, outputDir: string = 'Downloaded'): Promise<string> {
         const { default: fetch } = await import('node-fetch');
         const page = await this.getPageById(pageId, bodyFormat);
         if (!page) {throw new Error(`Page with ID ${pageId} not found.`);}
-        const formato = bodyFormat;
+        // For Server, ATLAS_DOC_FORMAT is not available; fall back to STORAGE
+        const formato = this.isServer() && bodyFormat === BodyFormat.ATLAS_DOC_FORMAT ? BodyFormat.STORAGE : bodyFormat;
         let conteudo: string;
         try {
             conteudo = page.body?.[formato]?.value;
@@ -102,7 +164,7 @@ export class ConfluenceClient {
         let labelsList = '';
         try {
             // v1 API para labels
-            let baseUrlV1 = this.baseUrl.includes('/api/v2') ? this.baseUrl.split('/api/v2')[0] : this.baseUrl;
+            const baseUrlV1 = this.getBaseUrlV1();
             const url = `${baseUrlV1}/rest/api/content/${pageId}/label`;
             const resp = await fetch(url, { headers: this.getAuthHeader() });
             if (resp.ok) {
@@ -163,8 +225,7 @@ export class ConfluenceClient {
 
     async uploadAttachment(pageId: string, filePath: string): Promise<string | null> {
         const { default: fetch } = await import('node-fetch');
-        // Descobre a base da URL para API v1
-        let baseUrlV1 = this.baseUrl.includes('/api/v2') ? this.baseUrl.split('/api/v2')[0] : this.baseUrl;
+        const baseUrlV1 = this.getBaseUrlV1();
         const fileName = basename(filePath);
         // Verifica se o anexo já existe
         const checkUrl = `${baseUrlV1}/rest/api/content/${pageId}/child/attachment?filename=${encodeURIComponent(fileName)}`;
@@ -243,7 +304,7 @@ export class ConfluenceClient {
     // Remove todas as labels da página
     async removeAllLabels(pageId: string): Promise<void> {
         const { default: fetch } = await import('node-fetch');
-        let baseUrlV1 = this.baseUrl.includes('/api/v2') ? this.baseUrl.split('/api/v2')[0] : this.baseUrl;
+        const baseUrlV1 = this.getBaseUrlV1();
         const url = `${baseUrlV1}/rest/api/content/${pageId}/label`;
         const resp = await fetch(url, { headers: this.getAuthHeader() });
         if (!resp.ok) { throw new Error(await resp.text()); }
@@ -251,7 +312,10 @@ export class ConfluenceClient {
         if (Array.isArray(data.results)) {
             for (const label of data.results) {
                 const labelName = label.name;
-                const deleteUrl = `${baseUrlV1}/rest/api/content/${pageId}/label?name=${encodeURIComponent(labelName)}`;
+                // Server uses path param /{label}, Cloud uses query param ?name=
+                const deleteUrl = this.isServer()
+                    ? `${baseUrlV1}/rest/api/content/${pageId}/label/${encodeURIComponent(labelName)}`
+                    : `${baseUrlV1}/rest/api/content/${pageId}/label?name=${encodeURIComponent(labelName)}`;
                 const delResp = await fetch(deleteUrl, { method: 'DELETE', headers: this.getAuthHeader() });
                 if (!delResp.ok) { throw new Error(await delResp.text()); }
             }
@@ -261,7 +325,7 @@ export class ConfluenceClient {
     // Remove todas as propriedades da página
     async removeAllProperties(pageId: string): Promise<void> {
         const { default: fetch } = await import('node-fetch');
-        let baseUrlV1 = this.baseUrl.includes('/api/v2') ? this.baseUrl.split('/api/v2')[0] : this.baseUrl;
+        const baseUrlV1 = this.getBaseUrlV1();
         const props = await this.getContentProperties(pageId);
         for (const prop of props) {
             if (prop.key) {
@@ -327,17 +391,41 @@ export class ConfluenceClient {
         // Remove bloco <csp:parameters> do conteúdo antes de enviar
         let contentToSend = content.replace(/<csp:parameters[\s\S]*?<\/csp:parameters>\s*/g, '');
 
-        const payload = {
-            spaceId,
-            status: 'current',
-            title,
-            parentId,
-            body: {
-                representation: BodyFormat.STORAGE,
-                value: contentToSend
+        let payload: any;
+        let url: string;
+        if (this.isServer()) {
+            // Server v1 API uses space.key and ancestors
+            const spaceKey = parentPage.space?.key;
+            if (!spaceKey) {
+                throw new Error(`Could not get space key for parentId ${parentId}`);
             }
-        };
-        const url = `${this.baseUrl}/api/v2/pages`;
+            payload = {
+                type: 'page',
+                status: 'current',
+                title,
+                space: { key: spaceKey },
+                ancestors: [{ id: parentId }],
+                body: {
+                    storage: {
+                        representation: BodyFormat.STORAGE,
+                        value: contentToSend
+                    }
+                }
+            };
+            url = `${this.baseUrl}/rest/api/content`;
+        } else {
+            payload = {
+                spaceId,
+                status: 'current',
+                title,
+                parentId,
+                body: {
+                    representation: BodyFormat.STORAGE,
+                    value: contentToSend
+                }
+            };
+            url = `${this.baseUrl}/api/v2/pages`;
+        }
         const resp = await fetch(url, {
             method: 'POST',
             headers: { ...this.getAuthHeader(), 'Content-Type': 'application/json' },
@@ -352,20 +440,40 @@ export class ConfluenceClient {
             const contentWithImages = await this._processImagesInContent(contentToSend, pageId, pasta);
             if (contentWithImages !== contentToSend) {
                 // Atualiza a página com o novo conteúdo
-                const updatePayload = {
-                    id: pageId,
-                    status: 'current',
-                    title,
-                    spaceId,
-                    body: {
-                        representation: BodyFormat.STORAGE,
-                        value: contentWithImages
-                    },
-                    version: {
-                        number: 2
-                    }
-                };
-                const updateUrl = `${this.baseUrl}/api/v2/pages/${pageId}`;
+                let updatePayload: any;
+                let updateUrl: string;
+                if (this.isServer()) {
+                    updatePayload = {
+                        type: 'page',
+                        status: 'current',
+                        title,
+                        body: {
+                            storage: {
+                                representation: BodyFormat.STORAGE,
+                                value: contentWithImages
+                            }
+                        },
+                        version: {
+                            number: 2
+                        }
+                    };
+                    updateUrl = `${this.baseUrl}/rest/api/content/${pageId}`;
+                } else {
+                    updatePayload = {
+                        id: pageId,
+                        status: 'current',
+                        title,
+                        spaceId,
+                        body: {
+                            representation: BodyFormat.STORAGE,
+                            value: contentWithImages
+                        },
+                        version: {
+                            number: 2
+                        }
+                    };
+                    updateUrl = `${this.baseUrl}/api/v2/pages/${pageId}`;
+                }
                 const updateResp = await fetch(updateUrl, {
                     method: 'PUT',
                     headers: { ...this.getAuthHeader(), 'Content-Type': 'application/json' },
@@ -398,20 +506,40 @@ export class ConfluenceClient {
         const version = page.version?.number || 1;
         const labelsList = extractLabels(content);
         const properties = await this.extractProperties(content);
-        const payload = {
-            id: pageId,
-            status: 'current',
-            title,
-            spaceId,
-            body: {
-                representation: BodyFormat.STORAGE,
-                value: contentToSend
-            },
-            version: {
-                number: version + 1
-            }
-        };
-        const url = `${this.baseUrl}/api/v2/pages/${pageId}`;
+        let payload: any;
+        let url: string;
+        if (this.isServer()) {
+            payload = {
+                type: 'page',
+                status: 'current',
+                title,
+                body: {
+                    storage: {
+                        representation: BodyFormat.STORAGE,
+                        value: contentToSend
+                    }
+                },
+                version: {
+                    number: version + 1
+                }
+            };
+            url = `${this.baseUrl}/rest/api/content/${pageId}`;
+        } else {
+            payload = {
+                id: pageId,
+                status: 'current',
+                title,
+                spaceId,
+                body: {
+                    representation: BodyFormat.STORAGE,
+                    value: contentToSend
+                },
+                version: {
+                    number: version + 1
+                }
+            };
+            url = `${this.baseUrl}/api/v2/pages/${pageId}`;
+        }
         const resp = await fetch(url, {
             method: 'PUT',
             headers: { ...this.getAuthHeader(), 'Content-Type': 'application/json' },
@@ -429,7 +557,7 @@ export class ConfluenceClient {
             throw new Error('labels must be a list of strings');
         }
         const payload = labels.map(label => ({ prefix: 'global', name: label }));
-        let baseUrlV1 = this.baseUrl.includes('/api/v2') ? this.baseUrl.split('/api/v2')[0] : this.baseUrl;
+        const baseUrlV1 = this.getBaseUrlV1();
         const url = `${baseUrlV1}/rest/api/content/${pageId}/label`;
         const resp = await fetch(url, {
             method: 'POST',
@@ -442,7 +570,7 @@ export class ConfluenceClient {
 
     async getContentProperties(pageId: string): Promise<any[]> {
         const { default: fetch } = await import('node-fetch');
-        let baseUrlV1 = this.baseUrl.includes('/api/v2') ? this.baseUrl.split('/api/v2')[0] : this.baseUrl;
+        const baseUrlV1 = this.getBaseUrlV1();
         const url = `${baseUrlV1}/rest/api/content/${pageId}/property`;
         const resp = await fetch(url, { headers: this.getAuthHeader() });
         if (!resp.ok) {throw new Error(await resp.text());}
@@ -452,7 +580,7 @@ export class ConfluenceClient {
 
     async updateContentProperty(pageId: string, key: string, value: any): Promise<any> {
         const { default: fetch } = await import('node-fetch');
-        let baseUrlV1 = this.baseUrl.includes('/api/v2') ? this.baseUrl.split('/api/v2')[0] : this.baseUrl;
+        const baseUrlV1 = this.getBaseUrlV1();
         const url = `${baseUrlV1}/rest/api/content/${pageId}/property/${key}`;
         // Buscar a versão atual da propriedade (se existir)
         let versionNumber = 1;
@@ -480,11 +608,11 @@ export async function publishConfluenceFile(filePath: string) {
 
     async function insertFileIdInFile(filePath: string, fileId: string) {
         let conteudo = await fsPromises.readFile(filePath, 'utf-8');
-        
+
         // Verifica se existe a estrutura do CSP
         const cspRegex = /<csp:parameters[\s\S]*?<\/csp:parameters>/;
         const cspMatch = conteudo.match(cspRegex);
-        
+
         if (cspMatch) {
             // Se existe a estrutura do CSP, remove a tag file_id existente e insere a nova
             conteudo = conteudo.replace(/<csp:file_id>[\s\S]*?<\/csp:file_id>\s*/, '');
@@ -505,7 +633,7 @@ export async function publishConfluenceFile(filePath: string) {
             const cspBlock = createXMLCSPBlock(cspMetadata) + '\n\n';
             conteudo = cspBlock + conteudo;
         }
-        
+
         await fsPromises.writeFile(filePath, conteudo, { encoding: 'utf-8' });
     }
 
@@ -513,12 +641,12 @@ export async function publishConfluenceFile(filePath: string) {
         let conteudo = await fsPromises.readFile(filePath, 'utf-8');
         const cspRegex = /<csp:parameters[\s\S]*?<\/csp:parameters>/;
         const cspMatch = conteudo.match(cspRegex);
-        
+
         if (cspMatch) {
             const cspContent = cspMatch[0];
             const propertiesRegex = /<csp:properties>[\s\S]*?<\/csp:properties>/;
             const propertiesMatch = cspContent.match(propertiesRegex);
-            
+
             if (propertiesMatch) {
                 // Verifica se as propriedades já existem
                 let propertiesContent = propertiesMatch[0];
@@ -526,12 +654,12 @@ export async function publishConfluenceFile(filePath: string) {
                     { key: 'content-appearance-published', value: 'fixed-width' },
                     { key: 'content-appearance-draft', value: 'fixed-width' }
                 ];
-                
+
                 let hasChanges = false;
                 for (const prop of requiredProperties) {
                     const keyRegex = new RegExp(`<csp:key>${prop.key}</csp:key>\\s*<csp:value>([^<]*)</csp:value>`);
                     const keyMatch = propertiesContent.match(keyRegex);
-                    
+
                     if (!keyMatch) {
                         // Se a propriedade não existe, adiciona ela
                         hasChanges = true;
@@ -542,7 +670,7 @@ export async function publishConfluenceFile(filePath: string) {
                     }
                     // Se a propriedade já existe, mantém o valor original
                 }
-                
+
                 // Atualiza o conteúdo do arquivo apenas se houver mudanças
                 if (hasChanges) {
                     conteudo = conteudo.replace(propertiesRegex, propertiesContent);
@@ -587,4 +715,4 @@ export async function publishConfluenceFile(filePath: string) {
         await insertFileIdInFile(filePath, pageId);
     }
     return { pageId, resposta };
-} 
+}

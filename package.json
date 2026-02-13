@@ -2,7 +2,7 @@
   "name": "confluence-smart-publisher",
   "displayName": "Confluence Smart Publisher",
   "description": "Publish and manage Confluence pages directly from VS Code",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "icon": "images/csp-icon.png",
   "engines": {
     "vscode": "^1.99.0"
@@ -137,6 +137,24 @@
           "type": "string",
           "default": "",
           "description": "Confluence API Token (generate at https://id.atlassian.com/manage-profile/security/api-tokens)"
+        },
+        "confluenceSmartPublisher.useBearerAuth": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use Bearer token authentication instead of Basic authentication. When enabled, the API Token is sent as a Bearer token and the username is not required."
+        },
+        "confluenceSmartPublisher.confluenceVersion": {
+          "type": "string",
+          "default": "cloud",
+          "enum": [
+            "cloud",
+            "server"
+          ],
+          "enumDescriptions": [
+            "Confluence Cloud - Uses the v2 REST API (/api/v2/pages) for page operations. Suitable for Confluence Cloud instances (e.g., https://company.atlassian.net/wiki).",
+            "Confluence Server/Data Center - Uses the v1 REST API (/rest/api/content) for all operations. Suitable for self-hosted Confluence instances."
+          ],
+          "description": "Choose the Confluence deployment type. This determines which API endpoints are used for page operations."
         },
         "confluenceSmartPublisher.format.numberChapters": {
           "type": "boolean",
