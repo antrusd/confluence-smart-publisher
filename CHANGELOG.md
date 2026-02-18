@@ -2,6 +2,27 @@
 
 All notable changes to the "confluence-smart-publisher" extension will be documented in this file.
 
+## [0.4.5] - 2026-02-18
+### Bug Fix
+- **🐛 XHTML Parsing Error on Publish**: Fixed `"Unexpected character '\\' (code 92) in start tag"` error when publishing `.confluence` files. The entire JSON file was being sent as the XHTML body instead of extracting just the `content` field. Added `extractStorageContent()` method that properly parses JSON/YAML wrappers and extracts the XHTML content string.
+
+### New Features
+- **📄 YAML Format Support**: `.confluence` files can now use YAML format in addition to JSON, with XHTML content in multiline pipe (`|`) block scalar for better readability
+  - Added `confluenceFileFormat` configuration option (`json` or `yaml`) to choose the output format when downloading pages
+  - All file operations (publish, download, insert file ID, update properties, format, validate) support both JSON and YAML formats transparently
+  - Created `createYAMLConfluenceBlock()` utility that always uses block literal style (`|`) for the content field
+- **📝 Title Field in CSP Metadata**: Added `title` field to CSP metadata so the page title can be set or overridden from within the `.confluence` file
+  - `createPageFromFile()` uses CSP title with fallback to filename
+  - `updatePageFromFile()` uses CSP title with fallback to existing page title
+  - `downloadConfluencePage()` includes `title` in downloaded CSP metadata
+- **🔢 ID-based Filenames**: Downloaded pages now use the page ID as the filename (`{pageId}.confluence` / `{pageId}.md`) instead of the sanitized page title
+
+### Technical Improvements
+- Updated `confluenceValidator.ts` to validate both JSON and YAML formats (no more false "Invalid JSON" diagnostics on YAML files)
+- Updated `confluenceFormatter.ts` to format both JSON and YAML documents, preserving block literal style on content
+- Added `_extractFromCSPObject()` helper in `csp-utils.ts` to avoid code duplication between JSON and YAML metadata extraction
+- Updated `extractCSPValue()` to support YAML full-document format with `csp:` key
+
 ## [0.4.4] - 2026-02-13
 ### Technical Enhancements
 - Support Bearer token as alternative to Basic authentication

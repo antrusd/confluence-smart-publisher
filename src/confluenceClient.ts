@@ -6,13 +6,16 @@ import { decodeHtmlEntities } from './confluenceFormatter';
 import { AdfToMarkdownConverter } from './adf-md-converter/adf-to-md-converter';
 import {
     createJSONCSPBlock,
+    createYAMLConfluenceBlock,
     extractProperties,
     extractParentId,
     extractLabels,
     extractFileId,
+    extractCSPValue,
     createXMLCSPBlock,
     createDefaultCSPProperties
 } from './csp-utils';
+import * as yaml from 'js-yaml';
 
 export enum BodyFormat {
     VIEW = 'view',
@@ -142,8 +145,8 @@ export class ConfluenceClient {
             throw new Error(`Content body.${formato}.value not found in API response.`);
         }
         const titulo = page.title || `${formato}_${pageId}`;
-        const tituloSanitizado = titulo.replace(/[\\/:*?"<>|]/g, '_');
-        const fileName = `${tituloSanitizado}.confluence`;
+        // Use page ID as filename for consistency and to avoid filesystem issues with special characters
+        const fileName = `${pageId}.confluence`;
         let baseDir: string;
         if (isAbsolute(outputDir)) {
             baseDir = outputDir;
@@ -192,18 +195,31 @@ export class ConfluenceClient {
         // Monta o objeto completo com metadados e conteúdo usando a função utilitária
         const cspMetadata = {
             file_id: String(fileId),
+            title: titulo,
             labels_list: labelsList,
             parent_id: String(parentId),
             properties: propertiesArr
         };
-        const contentParsed = (() => {
-            try {
-                return JSON.parse(conteudo);
-            } catch {
-                return conteudo; // fallback se não for JSON válido
-            }
-        })();
-        const conteudoFinal = createJSONCSPBlock(cspMetadata, contentParsed);
+        // Determine the output format from configuration (default: json)
+        const config = workspace.getConfiguration('confluenceSmartPublisher');
+        const outputFormat = (config.get('confluenceFileFormat') as string) || 'json';
+
+        let conteudoFinal: string;
+        if (outputFormat === 'yaml') {
+            // For YAML format, content is always stored as a string (XHTML or raw)
+            const contentStr = typeof conteudo === 'string' ? conteudo : JSON.stringify(conteudo);
+            conteudoFinal = createYAMLConfluenceBlock(cspMetadata, contentStr);
+        } else {
+            // Default: JSON format
+            const contentParsed = (() => {
+                try {
+                    return JSON.parse(conteudo);
+                } catch {
+                    return conteudo; // fallback se não for JSON válido
+                }
+            })();
+            conteudoFinal = createJSONCSPBlock(cspMetadata, contentParsed);
+        }
         writeFileSync(filePath, conteudoFinal, { encoding: 'utf-8' });
 
         // NOVO: Converter para Markdown se for JSON ADF
@@ -213,7 +229,7 @@ export class ConfluenceClient {
                 const converter = new AdfToMarkdownConverter();
                 const markdownBlock = await converter.convertNode(adfJson, 0, this.baseUrl);
                 const markdown = markdownBlock.markdown;
-                const mdFileName = `${tituloSanitizado}.md`;
+                const mdFileName = `${pageId}.md`;
                 const mdFilePath = join(baseDir, mdFileName);
                 writeFileSync(mdFilePath, markdown, { encoding: 'utf-8' });
             } catch (e) {
@@ -358,25 +374,53 @@ export class ConfluenceClient {
 
     /**
      * Extracts the XHTML storage content to send to Confluence from the file content.
-     * Handles both JSON format (with "csp" and "content" fields) and legacy XHTML format
-     * (with <csp:parameters> XML blocks).
+     * Handles JSON format, YAML format, and legacy XHTML format.
      *
      * For JSON format files, the "content" field already contains the XHTML storage string,
      * so it is extracted via JSON.parse to properly unescape JSON string encoding (e.g., \" → ").
      *
+     * For YAML format files, the "content" field contains the XHTML storage string,
+     * typically using YAML block scalar (|) for multiline readability.
+     *
      * For legacy XHTML files, the <csp:parameters> block is stripped via regex.
      */
     private extractStorageContent(rawContent: string): string {
+        // Try JSON format first
         try {
             const parsed = JSON.parse(rawContent);
             if (parsed && typeof parsed.content === 'string') {
                 return parsed.content;
             }
         } catch {
-            // Not valid JSON — fall through to legacy XHTML handling
+            // Not valid JSON — try YAML next
+        }
+        // Try YAML format
+        try {
+            const parsed = yaml.load(rawContent) as any;
+            if (parsed && typeof parsed === 'object' && typeof parsed.content === 'string') {
+                return parsed.content;
+            }
+        } catch {
+            // Not valid YAML — fall through to legacy XHTML handling
         }
         // Legacy XHTML format: strip <csp:parameters> block
         return rawContent.replace(/<csp:parameters[\s\S]*?<\/csp:parameters>\s*/g, '');
+    }
+
+    /**
+     * Detects the format of a .confluence file content.
+     * Returns 'json', 'yaml', or 'xml' (legacy).
+     */
+    private detectFileFormat(rawContent: string): 'json' | 'yaml' | 'xml' {
+        try {
+            const parsed = JSON.parse(rawContent);
+            if (parsed && parsed.csp) { return 'json'; }
+        } catch { /* not JSON */ }
+        try {
+            const parsed = yaml.load(rawContent) as any;
+            if (parsed && typeof parsed === 'object' && parsed.csp) { return 'yaml'; }
+        } catch { /* not YAML */ }
+        return 'xml';
     }
 
     async createPageFromFile(filePath: string): Promise<any> {
@@ -400,14 +444,20 @@ export class ConfluenceClient {
         }
         const spaceId = parentPage.spaceId;
 
-        // Título
-        const titleBase = basename(filePath, extname(filePath));
-        let cardJiraId: string | null = null;
-        const match = content.match(/<h1>Card Jira<\/h1>\s*<a [^>]*href="[^"]+\/browse\/([A-Z]+-\d+)/);
-        if (match) {
-            cardJiraId = match[1];
+        // Título: use title from CSP metadata if available, otherwise fall back to file name
+        const cspTitle = extractCSPValue(content, 'title');
+        let title: string;
+        if (cspTitle && typeof cspTitle === 'string' && cspTitle.trim()) {
+            title = cspTitle.trim();
+        } else {
+            const titleBase = basename(filePath, extname(filePath));
+            let cardJiraId: string | null = null;
+            const match = content.match(/<h1>Card Jira<\/h1>\s*<a [^>]*href="[^"]+\/browse\/([A-Z]+-\d+)/);
+            if (match) {
+                cardJiraId = match[1];
+            }
+            title = cardJiraId ? `${titleBase} (${cardJiraId})` : titleBase;
         }
-        const title = cardJiraId ? `${titleBase} (${cardJiraId})` : titleBase;
 
         // Extract XHTML storage content (handles both JSON and legacy XHTML formats)
         let contentToSend = this.extractStorageContent(content);
@@ -523,7 +573,9 @@ export class ConfluenceClient {
         if (!page) {throw new Error(`Page with ID ${pageId} not found.`);}
         const spaceId = page.spaceId;
         if (!spaceId) {throw new Error(`spaceId not found for page ${pageId}`);}
-        const title = page.title;
+        // Use title from CSP metadata if available, otherwise use existing page title
+        const cspTitle = extractCSPValue(content, 'title');
+        const title = (cspTitle && typeof cspTitle === 'string' && cspTitle.trim()) ? cspTitle.trim() : page.title;
         const version = page.version?.number || 1;
         const labelsList = extractLabels(content);
         const properties = await this.extractProperties(content);
@@ -639,7 +691,20 @@ export async function publishConfluenceFile(filePath: string) {
                 return;
             }
         } catch {
-            // Not JSON, fall through to legacy XML handling
+            // Not JSON, try YAML next
+        }
+
+        // Try YAML format
+        try {
+            const parsed = yaml.load(conteudo) as any;
+            if (parsed && typeof parsed === 'object' && parsed.csp) {
+                parsed.csp.file_id = fileId;
+                const yamlStr = createYAMLConfluenceBlock(parsed.csp, parsed.content);
+                await fsPromises.writeFile(filePath, yamlStr, { encoding: 'utf-8' });
+                return;
+            }
+        } catch {
+            // Not YAML, fall through to legacy XML handling
         }
 
         // Legacy XML format
@@ -671,6 +736,11 @@ export async function publishConfluenceFile(filePath: string) {
     async function updatePropertiesInFile(filePath: string) {
         let conteudo = await fsPromises.readFile(filePath, 'utf-8');
 
+        const requiredProperties = [
+            { key: 'content-appearance-published', value: 'fixed-width' },
+            { key: 'content-appearance-draft', value: 'fixed-width' }
+        ];
+
         // Try JSON format first
         try {
             const parsed = JSON.parse(conteudo);
@@ -678,10 +748,6 @@ export async function publishConfluenceFile(filePath: string) {
                 if (!Array.isArray(parsed.csp.properties)) {
                     parsed.csp.properties = [];
                 }
-                const requiredProperties = [
-                    { key: 'content-appearance-published', value: 'fixed-width' },
-                    { key: 'content-appearance-draft', value: 'fixed-width' }
-                ];
                 let hasChanges = false;
                 for (const prop of requiredProperties) {
                     const exists = parsed.csp.properties.some((p: any) => p.key === prop.key);
@@ -696,7 +762,32 @@ export async function publishConfluenceFile(filePath: string) {
                 return;
             }
         } catch {
-            // Not JSON, fall through to legacy XML handling
+            // Not JSON, try YAML next
+        }
+
+        // Try YAML format
+        try {
+            const parsed = yaml.load(conteudo) as any;
+            if (parsed && typeof parsed === 'object' && parsed.csp) {
+                if (!Array.isArray(parsed.csp.properties)) {
+                    parsed.csp.properties = [];
+                }
+                let hasChanges = false;
+                for (const prop of requiredProperties) {
+                    const exists = parsed.csp.properties.some((p: any) => p.key === prop.key);
+                    if (!exists) {
+                        parsed.csp.properties.push(prop);
+                        hasChanges = true;
+                    }
+                }
+                if (hasChanges) {
+                    const yamlStr = createYAMLConfluenceBlock(parsed.csp, parsed.content);
+                    await fsPromises.writeFile(filePath, yamlStr, { encoding: 'utf-8' });
+                }
+                return;
+            }
+        } catch {
+            // Not YAML, fall through to legacy XML handling
         }
 
         // Legacy XML format

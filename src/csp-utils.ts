@@ -1,11 +1,14 @@
 /**
  * Utility for creating CSP (Confluence Smart Publisher) blocks
- * Creates metadata blocks in JSON format for .confluence files
+ * Creates metadata blocks in JSON or YAML format for .confluence files
  * or in YAML frontmatter format for .md files
  */
 
+import * as yaml from 'js-yaml';
+
 export interface CSPMetadata {
     file_id?: string;
+    title?: string;
     labels_list?: string;
     parent_id?: string;
     properties?: Array<{ key: string; value: string }>;
@@ -59,6 +62,48 @@ export function createJSONCSPBlock(metadata: CSPMetadata, content?: any): string
     }
 
     return JSON.stringify(cspBlock, null, 2);
+}
+
+/**
+ * Creates a CSP block in YAML format for .confluence files.
+ * Uses YAML block scalar (|) for the content field to preserve multiline XHTML readability.
+ * @param metadata - CSP metadata
+ * @param content - XHTML storage content string (optional)
+ * @returns String with formatted YAML document
+ */
+export function createYAMLConfluenceBlock(metadata: CSPMetadata, content?: string): string {
+    // Build the csp metadata part separately so we can force block literal style on content
+    const cspPart: any = {
+        csp: {
+            file_id: metadata.file_id || '',
+            title: metadata.title || '',
+            labels_list: metadata.labels_list || '',
+            parent_id: metadata.parent_id || '',
+            properties: metadata.properties || []
+        }
+    };
+
+    const cspYaml = yaml.dump(cspPart, {
+        lineWidth: -1,
+        quotingType: '"',
+        forceQuotes: false,
+        noRefs: true
+    });
+
+    if (content === undefined) {
+        return cspYaml;
+    }
+
+    // Force block literal style (|) for content field by manually constructing it.
+    // Ensure content ends with a newline so YAML block scalar is well-formed.
+    const contentValue = content.endsWith('\n') ? content : content + '\n';
+    // Indent each line of content by 2 spaces for YAML block scalar
+    const indentedContent = contentValue
+        .split('\n')
+        .map(line => line.length > 0 ? '  ' + line : '')
+        .join('\n');
+
+    return cspYaml + 'content: |\n' + indentedContent;
 }
 
 /**
@@ -230,6 +275,30 @@ export function extractParentId(content: string): string | null {
 }
 
 /**
+ * Internal helper to extract a value from a parsed CSP metadata object.
+ * Used by extractCSPValue to avoid code duplication between JSON and YAML parsing paths.
+ */
+function _extractFromCSPObject(csp: any, key: string, propertyKey?: string): any {
+    if (key === 'properties' && propertyKey) {
+        if (Array.isArray(csp.properties)) {
+            const prop = csp.properties.find((p: any) => p && p.key === propertyKey);
+            return prop ? prop.value : null;
+        }
+        return null;
+    } else if (key === 'properties') {
+        return Array.isArray(csp.properties) ? csp.properties : [];
+    } else if (key === 'labels_list') {
+        const labelsList = csp.labels_list;
+        if (typeof labelsList === 'string' && labelsList.trim()) {
+            return labelsList.split(',').map((label: string) => label.trim()).filter((label: string) => label);
+        }
+        return [];
+    } else {
+        return csp[key] || null;
+    }
+}
+
+/**
  * Generic function to extract any CSP metadata value from content in any format (JSON, YAML, XML)
  * @param content - Content containing CSP metadata
  * @param key - The key to extract (e.g., 'file_id', 'labels_list', 'properties')
@@ -245,30 +314,20 @@ export function extractCSPValue(content: string, key: string, propertyKey?: stri
     try {
         const parsed = JSON.parse(content);
         if (parsed.csp) {
-            if (key === 'properties' && propertyKey) {
-                // Extract specific property value
-                if (Array.isArray(parsed.csp.properties)) {
-                    const prop = parsed.csp.properties.find((p: any) => p && p.key === propertyKey);
-                    return prop ? prop.value : null;
-                }
-                return null;
-            } else if (key === 'properties') {
-                // Return all properties
-                return Array.isArray(parsed.csp.properties) ? parsed.csp.properties : [];
-            } else if (key === 'labels_list') {
-                // Special handling for labels - return as array
-                const labelsList = parsed.csp.labels_list;
-                if (typeof labelsList === 'string' && labelsList.trim()) {
-                    return labelsList.split(',').map((label: string) => label.trim()).filter((label: string) => label);
-                }
-                return [];
-            } else {
-                // Direct key extraction
-                return parsed.csp[key] || null;
-            }
+            return _extractFromCSPObject(parsed.csp, key, propertyKey);
         }
     } catch {
         // Not JSON, continue to other formats
+    }
+
+    // Try full YAML document format (for .confluence files with csp: key)
+    try {
+        const parsed = yaml.load(content) as any;
+        if (parsed && typeof parsed === 'object' && parsed.csp) {
+            return _extractFromCSPObject(parsed.csp, key, propertyKey);
+        }
+    } catch {
+        // Not valid YAML, continue to other formats
     }
 
     // Try YAML frontmatter format (for .md files)

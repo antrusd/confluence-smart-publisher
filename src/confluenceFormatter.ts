@@ -4,17 +4,32 @@
 import * as vscode from 'vscode';
 import { decode as decodeEntities, EntityLevel } from 'entities';
 import { TAG_BEHAVIOR } from './confluenceSchema';
+import * as yaml from 'js-yaml';
+import { createYAMLConfluenceBlock } from './csp-utils';
 
-// Formatter para arquivos Confluence (agora JSON)
+// Formatter para arquivos Confluence (JSON or YAML)
 
 export function formatConfluenceDocument(text: string): string {
+  // Try JSON format first
   try {
-    // O arquivo inteiro é um único objeto JSON
     const obj = JSON.parse(text);
     return JSON.stringify(obj, null, 2) + '\n';
-  } catch (e) {
-    throw new Error('Invalid JSON: ' + (e instanceof Error ? e.message : String(e)));
+  } catch {
+    // Not JSON, try YAML
   }
+
+  // Try YAML format
+  try {
+    const obj = yaml.load(text) as any;
+    if (obj && typeof obj === 'object' && obj.csp) {
+      // Use createYAMLConfluenceBlock to force block literal style (|) on content
+      return createYAMLConfluenceBlock(obj.csp, obj.content);
+    }
+  } catch {
+    // Not YAML either
+  }
+
+  throw new Error('Invalid format: file is neither valid JSON nor YAML');
 }
 
 function numberHeadings(text: string): string {

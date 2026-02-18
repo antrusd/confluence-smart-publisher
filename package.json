@@ -180,6 +180,19 @@
             "Pure LaTeX - Original syntax without modifications. Used in: scientific documents, when you need exact LaTeX syntax. May not work in all web viewers."
           ],
           "description": "Choose the math renderer for formula blocks based on where the markdown will be viewed"
+        },
+        "confluenceSmartPublisher.confluenceFileFormat": {
+          "type": "string",
+          "default": "json",
+          "enum": [
+            "json",
+            "yaml"
+          ],
+          "enumDescriptions": [
+            "JSON format - Default format. Stores CSP metadata and XHTML content in a JSON structure.",
+            "YAML format - Uses YAML with block scalar (|) for the content field, making XHTML content more readable and editable in multiline format."
+          ],
+          "description": "Choose the file format for .confluence files when downloading pages. Both formats are supported for publishing."
         }
       }
     },
