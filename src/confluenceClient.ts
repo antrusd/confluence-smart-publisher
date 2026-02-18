@@ -356,13 +356,34 @@ export class ConfluenceClient {
         return extractProperties(content);
     }
 
+    /**
+     * Extracts the XHTML storage content to send to Confluence from the file content.
+     * Handles both JSON format (with "csp" and "content" fields) and legacy XHTML format
+     * (with <csp:parameters> XML blocks).
+     *
+     * For JSON format files, the "content" field already contains the XHTML storage string,
+     * so it is extracted via JSON.parse to properly unescape JSON string encoding (e.g., \" → ").
+     *
+     * For legacy XHTML files, the <csp:parameters> block is stripped via regex.
+     */
+    private extractStorageContent(rawContent: string): string {
+        try {
+            const parsed = JSON.parse(rawContent);
+            if (parsed && typeof parsed.content === 'string') {
+                return parsed.content;
+            }
+        } catch {
+            // Not valid JSON — fall through to legacy XHTML handling
+        }
+        // Legacy XHTML format: strip <csp:parameters> block
+        return rawContent.replace(/<csp:parameters[\s\S]*?<\/csp:parameters>\s*/g, '');
+    }
+
     async createPageFromFile(filePath: string): Promise<any> {
         const config = workspace.getConfiguration('confluenceSmartPublisher');
         const pasta = dirname(filePath);
         const parentFile = join(pasta, '.parent');
         let content = readFileSync(filePath, 'utf-8');
-
-        content = content.replace(/\n +/g, '\n');
 
         // Extrair informações usando função utilitária
         const parentId = extractParentId(content);
@@ -388,8 +409,8 @@ export class ConfluenceClient {
         }
         const title = cardJiraId ? `${titleBase} (${cardJiraId})` : titleBase;
 
-        // Remove bloco <csp:parameters> do conteúdo antes de enviar
-        let contentToSend = content.replace(/<csp:parameters[\s\S]*?<\/csp:parameters>\s*/g, '');
+        // Extract XHTML storage content (handles both JSON and legacy XHTML formats)
+        let contentToSend = this.extractStorageContent(content);
 
         let payload: any;
         let url: string;
@@ -491,10 +512,10 @@ export class ConfluenceClient {
         const config = workspace.getConfiguration('confluenceSmartPublisher');
         let content = readFileSync(filePath, 'utf-8');
 
-        content = content.replace(/\n +/g, '\n');
         const pageId = extractFileId(content);
         if (!pageId || !/^\d+$/.test(pageId)) {throw new Error(`Invalid or missing page ID in tag: ${pageId}`);}
-        let contentToSend = content.replace(/<csp:parameters[\s\S]*?<\/csp:parameters>\s*/g, '');
+        // Extract XHTML storage content (handles both JSON and legacy XHTML formats)
+        let contentToSend = this.extractStorageContent(content);
 
         const pasta = dirname(filePath);
         contentToSend = await this._processImagesInContent(contentToSend, pageId, pasta);
@@ -609,12 +630,23 @@ export async function publishConfluenceFile(filePath: string) {
     async function insertFileIdInFile(filePath: string, fileId: string) {
         let conteudo = await fsPromises.readFile(filePath, 'utf-8');
 
-        // Verifica se existe a estrutura do CSP
+        // Try JSON format first
+        try {
+            const parsed = JSON.parse(conteudo);
+            if (parsed && parsed.csp) {
+                parsed.csp.file_id = fileId;
+                await fsPromises.writeFile(filePath, JSON.stringify(parsed, null, 2), { encoding: 'utf-8' });
+                return;
+            }
+        } catch {
+            // Not JSON, fall through to legacy XML handling
+        }
+
+        // Legacy XML format
         const cspRegex = /<csp:parameters[\s\S]*?<\/csp:parameters>/;
         const cspMatch = conteudo.match(cspRegex);
 
         if (cspMatch) {
-            // Se existe a estrutura do CSP, remove a tag file_id existente e insere a nova
             conteudo = conteudo.replace(/<csp:file_id>[\s\S]*?<\/csp:file_id>\s*/, '');
             const cspContent = cspMatch[0];
             const newCspContent = cspContent.replace(
@@ -623,7 +655,6 @@ export async function publishConfluenceFile(filePath: string) {
             );
             conteudo = conteudo.replace(cspRegex, newCspContent);
         } else {
-            // Se não existe a estrutura do CSP, cria uma nova usando a função utilitária
             const cspMetadata = {
                 file_id: fileId,
                 labels_list: '',
@@ -639,6 +670,36 @@ export async function publishConfluenceFile(filePath: string) {
 
     async function updatePropertiesInFile(filePath: string) {
         let conteudo = await fsPromises.readFile(filePath, 'utf-8');
+
+        // Try JSON format first
+        try {
+            const parsed = JSON.parse(conteudo);
+            if (parsed && parsed.csp) {
+                if (!Array.isArray(parsed.csp.properties)) {
+                    parsed.csp.properties = [];
+                }
+                const requiredProperties = [
+                    { key: 'content-appearance-published', value: 'fixed-width' },
+                    { key: 'content-appearance-draft', value: 'fixed-width' }
+                ];
+                let hasChanges = false;
+                for (const prop of requiredProperties) {
+                    const exists = parsed.csp.properties.some((p: any) => p.key === prop.key);
+                    if (!exists) {
+                        parsed.csp.properties.push(prop);
+                        hasChanges = true;
+                    }
+                }
+                if (hasChanges) {
+                    await fsPromises.writeFile(filePath, JSON.stringify(parsed, null, 2), { encoding: 'utf-8' });
+                }
+                return;
+            }
+        } catch {
+            // Not JSON, fall through to legacy XML handling
+        }
+
+        // Legacy XML format
         const cspRegex = /<csp:parameters[\s\S]*?<\/csp:parameters>/;
         const cspMatch = conteudo.match(cspRegex);
 
@@ -648,7 +709,6 @@ export async function publishConfluenceFile(filePath: string) {
             const propertiesMatch = cspContent.match(propertiesRegex);
 
             if (propertiesMatch) {
-                // Verifica se as propriedades já existem
                 let propertiesContent = propertiesMatch[0];
                 const requiredProperties = [
                     { key: 'content-appearance-published', value: 'fixed-width' },
@@ -661,23 +721,19 @@ export async function publishConfluenceFile(filePath: string) {
                     const keyMatch = propertiesContent.match(keyRegex);
 
                     if (!keyMatch) {
-                        // Se a propriedade não existe, adiciona ela
                         hasChanges = true;
                         propertiesContent = propertiesContent.replace(
                             '</csp:properties>',
                             `    <csp:key>${prop.key}</csp:key>\n    <csp:value>${prop.value}</csp:value>\n  </csp:properties>`
                         );
                     }
-                    // Se a propriedade já existe, mantém o valor original
                 }
 
-                // Atualiza o conteúdo do arquivo apenas se houver mudanças
                 if (hasChanges) {
                     conteudo = conteudo.replace(propertiesRegex, propertiesContent);
                     await fsPromises.writeFile(filePath, conteudo, { encoding: 'utf-8' });
                 }
             } else {
-                // Adiciona o bloco de propriedades se não existir
                 const newProperties = `  <csp:properties>\n` +
                     `    <csp:key>content-appearance-published</csp:key>\n` +
                     `    <csp:value>fixed-width</csp:value>\n` +
