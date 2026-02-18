@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import { marked, MarkedOptions } from 'marked';
+import { randomUUID } from 'crypto';
 import { createXMLCSPBlock, createDefaultCSPProperties } from './csp-utils';
 
 export class MarkdownConverter {
@@ -67,8 +68,45 @@ export class MarkdownConverter {
         };
         const cspParameters = createXMLCSPBlock(cspMetadata);
 
+        // Convert <pre><code> blocks to Confluence ac:structured-macro code blocks
+        const convertedContent = this.convertCodeBlocksToMacro(htmlContent);
+
         // Retorna o conteúdo formatado sem o cabeçalho XML e sem o macro info
-        return `${cspParameters}\n\n${htmlContent}`;
+        return `${cspParameters}\n\n${convertedContent}`;
+    }
+
+    /**
+     * Converts HTML <pre><code> blocks to Confluence ac:structured-macro code blocks.
+     * Handles both language-specific (<code class="language-xxx">) and plain (<code>) blocks.
+     * HTML entities inside code content are unescaped since the content goes inside CDATA.
+     */
+    private convertCodeBlocksToMacro(html: string): string {
+        // Match <pre><code class="language-xxx">...</code></pre> or <pre><code>...</code></pre>
+        const codeBlockRegex = /<pre><code(?:\s+class="language-([^"]*)")?>([\s\S]*?)<\/code><\/pre>/g;
+
+        return html.replace(codeBlockRegex, (_match, language: string | undefined, codeContent: string) => {
+            // Unescape HTML entities since content goes inside CDATA
+            const rawContent = this.unescapeHtmlEntities(codeContent);
+            // Remove trailing newline that marked adds before </code>
+            const trimmedContent = rawContent.endsWith('\n') ? rawContent.slice(0, -1) : rawContent;
+            const macroId = randomUUID();
+            const languageParam = language
+                ? `<ac:parameter ac:name="language">${language}</ac:parameter>`
+                : '';
+            return `<ac:structured-macro ac:name="code" ac:schema-version="1" ac:macro-id="${macroId}">${languageParam}<ac:plain-text-body><![CDATA[${trimmedContent}]]></ac:plain-text-body></ac:structured-macro>`;
+        });
+    }
+
+    /**
+     * Unescapes basic HTML entities back to raw characters (for CDATA content).
+     */
+    private unescapeHtmlEntities(text: string): string {
+        return text
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'");
     }
 
     /**

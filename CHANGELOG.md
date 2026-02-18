@@ -2,6 +2,14 @@
 
 All notable changes to the "confluence-smart-publisher" extension will be documented in this file.
 
+## [0.4.7] - 2026-02-18
+### Enhancement
+- **📝 Confluence Code Macro for Markdown Conversion**: The "Convert Markdown to Confluence" command now generates `ac:structured-macro` code blocks instead of `<pre><code>` tags
+  - Code blocks use `<ac:structured-macro ac:name="code">` with `<ac:plain-text-body><![CDATA[...]]></ac:plain-text-body>` format
+  - Language parameter is included when specified in the Markdown fenced code block (e.g., `` ```diff ``)
+  - Each macro gets a unique UUID for `ac:macro-id`
+  - HTML entities inside code content are properly unescaped for CDATA sections
+
 ## [0.4.6] - 2026-02-18
 ### Bug Fix
 - **🐛 Non-blocking Label/Property Operations**: Fixed 500 Internal Server Error during publish caused by DELETE label/property operations failing due to insufficient permissions. These operations are now best-effort — failures are logged as `[WARN]` in the Output channel but no longer block the publish workflow.
