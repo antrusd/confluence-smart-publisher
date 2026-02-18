@@ -1,3 +1,4 @@
+import * as vscode from 'vscode';
 import { workspace } from 'vscode';
 import { mkdirSync, writeFileSync, createReadStream, existsSync, readFileSync, promises as fsPromises } from 'fs';
 import { isAbsolute, join, dirname, basename, extname } from 'path';
@@ -33,6 +34,8 @@ export class ConfluenceClient {
     private apiToken: string;
     private useBearerAuth: boolean;
     private confluenceVersion: 'cloud' | 'server';
+    private debugMode: boolean;
+    private outputChannel: vscode.OutputChannel;
 
     constructor() {
         // Preferencialmente, use as configurações do VSCode para armazenar as credenciais
@@ -42,6 +45,8 @@ export class ConfluenceClient {
         this.apiToken = config.get('apiToken') as string || '';
         this.useBearerAuth = config.get('useBearerAuth') as boolean || false;
         this.confluenceVersion = (config.get('confluenceVersion') as string || 'cloud') as 'cloud' | 'server';
+        this.debugMode = config.get('debug') as boolean || false;
+        this.outputChannel = vscode.window.createOutputChannel('Confluence Smart Publisher');
         if (!this.baseUrl || !this.apiToken) {
             throw new Error('Configure baseUrl and apiToken in the extension settings.');
         }
@@ -75,6 +80,65 @@ export class ConfluenceClient {
     }
 
     /**
+     * Logs a debug message to the output channel when debug mode is enabled.
+     */
+    /**
+     * Logs a debug message to the output channel when debug mode is enabled.
+     */
+    private debugLog(message: string): void {
+        if (this.debugMode) {
+            this.outputChannel.appendLine(`[DEBUG] ${message}`);
+        }
+    }
+
+    /**
+     * Logs a warning message to the output channel (always, regardless of debug mode).
+     */
+    private warnLog(message: string): void {
+        this.outputChannel.appendLine(`[WARN] ${message}`);
+    }
+
+    /**
+     * Wrapper around node-fetch that logs HTTP request and response details when debug mode is enabled.
+     */
+    private async debugFetch(url: string, options?: any): Promise<any> {
+        const { default: fetch } = await import('node-fetch');
+        const method = options?.method || 'GET';
+        const hasBody = !!options?.body;
+
+        if (this.debugMode) {
+            this.debugLog(`→ ${method} ${url}`);
+            // Log headers (excluding Authorization for security)
+            if (options?.headers) {
+                const safeHeaders = { ...options.headers };
+                if (safeHeaders['Authorization']) {
+                    safeHeaders['Authorization'] = safeHeaders['Authorization'].substring(0, 15) + '...';
+                }
+                this.debugLog(`  Headers: ${JSON.stringify(safeHeaders)}`);
+            }
+            if (hasBody && typeof options.body === 'string') {
+                const bodyPreview = options.body.length > 1000
+                    ? options.body.substring(0, 1000) + `... (${options.body.length} chars total)`
+                    : options.body;
+                this.debugLog(`  Body: ${bodyPreview}`);
+            } else if (hasBody) {
+                this.debugLog(`  Body: [non-string body, e.g. FormData]`);
+            }
+        }
+
+        const startTime = Date.now();
+        const resp = await fetch(url, options);
+        const elapsed = Date.now() - startTime;
+
+        if (this.debugMode) {
+            this.debugLog(`← ${resp.status} ${resp.statusText} (${elapsed}ms)`);
+            this.outputChannel.show(true);
+        }
+
+        return resp;
+    }
+
+    /**
      * Normalizes page response to a consistent format regardless of API version.
      * Cloud v2 API returns: { id, title, spaceId, parentId, body, version }
      * Server v1 API returns: { id, title, space: { key, id }, ancestors: [...], body, version }
@@ -96,14 +160,13 @@ export class ConfluenceClient {
     }
 
     async getPageByTitle(spaceKey: string, title: string): Promise<any | null> {
-        const { default: fetch } = await import('node-fetch');
         let url: string;
         if (this.isServer()) {
             url = `${this.baseUrl}/rest/api/content?spaceKey=${encodeURIComponent(spaceKey)}&title=${encodeURIComponent(title)}&expand=body.${BodyFormat.STORAGE},version,space,ancestors`;
         } else {
             url = `${this.baseUrl}/api/v2/pages?spaceKey=${encodeURIComponent(spaceKey)}&title=${encodeURIComponent(title)}&expand=body.${BodyFormat.STORAGE},version,space`;
         }
-        const resp = await fetch(url, { headers: { ...this.getAuthHeader(), 'Content-Type': 'application/json' } });
+        const resp = await this.debugFetch(url, { headers: { ...this.getAuthHeader(), 'Content-Type': 'application/json' } });
         if (!resp.ok) {throw new Error(await resp.text());}
         const data = await resp.json() as any;
         const page = data.results?.[0] || null;
@@ -111,7 +174,6 @@ export class ConfluenceClient {
     }
 
     async getPageById(pageId: string, bodyFormat: BodyFormat = BodyFormat.ATLAS_DOC_FORMAT): Promise<any | null> {
-        const { default: fetch } = await import('node-fetch');
         let url: string;
         if (this.isServer()) {
             // Server v1 API uses expand parameter for body format
@@ -120,7 +182,7 @@ export class ConfluenceClient {
         } else {
             url = `${this.baseUrl}/api/v2/pages/${pageId}?body-format=${bodyFormat}`;
         }
-        const resp = await fetch(url, { headers: { ...this.getAuthHeader(), 'Content-Type': 'application/json' } });
+        const resp = await this.debugFetch(url, { headers: { ...this.getAuthHeader(), 'Content-Type': 'application/json' } });
         if (resp.status === 404) {return null;}
         if (!resp.ok) {throw new Error(await resp.text());}
         const page = await resp.json() as any;
@@ -128,7 +190,6 @@ export class ConfluenceClient {
     }
 
     async downloadConfluencePage(pageId: string, bodyFormat: BodyFormat = BodyFormat.ATLAS_DOC_FORMAT, outputDir: string = 'Downloaded'): Promise<string> {
-        const { default: fetch } = await import('node-fetch');
         const page = await this.getPageById(pageId, bodyFormat);
         if (!page) {throw new Error(`Page with ID ${pageId} not found.`);}
         // For Server, ATLAS_DOC_FORMAT is not available; fall back to STORAGE
@@ -169,7 +230,7 @@ export class ConfluenceClient {
             // v1 API para labels
             const baseUrlV1 = this.getBaseUrlV1();
             const url = `${baseUrlV1}/rest/api/content/${pageId}/label`;
-            const resp = await fetch(url, { headers: this.getAuthHeader() });
+            const resp = await this.debugFetch(url, { headers: this.getAuthHeader() });
             if (resp.ok) {
                 const data = await resp.json();
                 if (Array.isArray(data.results)) {
@@ -240,12 +301,11 @@ export class ConfluenceClient {
     }
 
     async uploadAttachment(pageId: string, filePath: string): Promise<string | null> {
-        const { default: fetch } = await import('node-fetch');
         const baseUrlV1 = this.getBaseUrlV1();
         const fileName = basename(filePath);
         // Verifica se o anexo já existe
         const checkUrl = `${baseUrlV1}/rest/api/content/${pageId}/child/attachment?filename=${encodeURIComponent(fileName)}`;
-        let resp = await fetch(checkUrl, { headers: this.getAuthHeader() });
+        let resp = await this.debugFetch(checkUrl, { headers: this.getAuthHeader() });
         if (!resp.ok) {throw new Error(await resp.text());}
         const results = (await resp.json() as any).results || [];
         if (results.length > 0) {
@@ -256,7 +316,7 @@ export class ConfluenceClient {
         const url = `${baseUrlV1}/rest/api/content/${pageId}/child/attachment`;
         const form = new FormData();
         form.append('file', createReadStream(filePath), fileName);
-        resp = await fetch(url, {
+        resp = await this.debugFetch(url, {
             method: 'POST',
             headers: { ...this.getAuthHeader(), 'X-Atlassian-Token': 'no-check' },
             body: form as any
@@ -317,13 +377,15 @@ export class ConfluenceClient {
         return acResult;
     }
 
-    // Remove todas as labels da página
+    // Remove todas as labels da página (best-effort: logs errors but does not throw)
     async removeAllLabels(pageId: string): Promise<void> {
-        const { default: fetch } = await import('node-fetch');
         const baseUrlV1 = this.getBaseUrlV1();
         const url = `${baseUrlV1}/rest/api/content/${pageId}/label`;
-        const resp = await fetch(url, { headers: this.getAuthHeader() });
-        if (!resp.ok) { throw new Error(await resp.text()); }
+        const resp = await this.debugFetch(url, { headers: this.getAuthHeader() });
+        if (!resp.ok) {
+            this.warnLog(`Failed to list labels for page ${pageId}: ${resp.status} ${resp.statusText}`);
+            return;
+        }
         const data = await resp.json();
         if (Array.isArray(data.results)) {
             for (const label of data.results) {
@@ -332,37 +394,70 @@ export class ConfluenceClient {
                 const deleteUrl = this.isServer()
                     ? `${baseUrlV1}/rest/api/content/${pageId}/label/${encodeURIComponent(labelName)}`
                     : `${baseUrlV1}/rest/api/content/${pageId}/label?name=${encodeURIComponent(labelName)}`;
-                const delResp = await fetch(deleteUrl, { method: 'DELETE', headers: this.getAuthHeader() });
-                if (!delResp.ok) { throw new Error(await delResp.text()); }
+                try {
+                    const delResp = await this.debugFetch(deleteUrl, { method: 'DELETE', headers: this.getAuthHeader() });
+                    if (!delResp.ok) {
+                        this.warnLog(`Failed to delete label "${labelName}" from page ${pageId}: ${delResp.status} ${delResp.statusText}`);
+                    }
+                } catch (e: any) {
+                    this.warnLog(`Error deleting label "${labelName}" from page ${pageId}: ${e.message || e}`);
+                }
             }
         }
     }
 
-    // Remove todas as propriedades da página
+    // Remove todas as propriedades da página (best-effort: logs errors but does not throw)
     async removeAllProperties(pageId: string): Promise<void> {
-        const { default: fetch } = await import('node-fetch');
-        const baseUrlV1 = this.getBaseUrlV1();
-        const props = await this.getContentProperties(pageId);
+        let props: any[];
+        try {
+            props = await this.getContentProperties(pageId);
+        } catch (e: any) {
+            this.warnLog(`Failed to list properties for page ${pageId}: ${e.message || e}`);
+            return;
+        }
         for (const prop of props) {
             if (prop.key) {
+                const baseUrlV1 = this.getBaseUrlV1();
                 const url = `${baseUrlV1}/rest/api/content/${pageId}/property/${encodeURIComponent(prop.key)}`;
-                const delResp = await fetch(url, { method: 'DELETE', headers: this.getAuthHeader() });
-                if (!delResp.ok && delResp.status !== 404) { throw new Error(await delResp.text()); }
+                try {
+                    const delResp = await this.debugFetch(url, { method: 'DELETE', headers: this.getAuthHeader() });
+                    if (!delResp.ok && delResp.status !== 404) {
+                        this.warnLog(`Failed to delete property "${prop.key}" from page ${pageId}: ${delResp.status} ${delResp.statusText}`);
+                    }
+                } catch (e: any) {
+                    this.warnLog(`Error deleting property "${prop.key}" from page ${pageId}: ${e.message || e}`);
+                }
             }
         }
     }
 
-    // Aplica as labels e propriedades do arquivo, removendo todas as existentes antes
+    // Aplica as labels e propriedades do arquivo (best-effort: each step continues on failure)
     private async applyLabelsAndPropertiesFromFile(pageId: string, labelsList: string[], propriedades: { key: string, value: string }[]) {
-        await this.removeAllLabels(pageId);
-        await this.removeAllProperties(pageId);
+        try {
+            await this.removeAllLabels(pageId);
+        } catch (e: any) {
+            this.warnLog(`removeAllLabels failed for page ${pageId}: ${e.message || e}`);
+        }
+        try {
+            await this.removeAllProperties(pageId);
+        } catch (e: any) {
+            this.warnLog(`removeAllProperties failed for page ${pageId}: ${e.message || e}`);
+        }
         if (labelsList.length > 0) {
-            await this.setPageLabels(pageId, labelsList);
+            try {
+                await this.setPageLabels(pageId, labelsList);
+            } catch (e: any) {
+                this.warnLog(`setPageLabels failed for page ${pageId}: ${e.message || e}`);
+            }
         }
         if (propriedades.length > 0) {
             for (const prop of propriedades) {
                 if (prop.key) {
-                    await this.updateContentProperty(pageId, prop.key, prop.value);
+                    try {
+                        await this.updateContentProperty(pageId, prop.key, prop.value);
+                    } catch (e: any) {
+                        this.warnLog(`updateContentProperty failed for page ${pageId}, key "${prop.key}": ${e.message || e}`);
+                    }
                 }
             }
         }
@@ -497,7 +592,7 @@ export class ConfluenceClient {
             };
             url = `${this.baseUrl}/api/v2/pages`;
         }
-        const resp = await fetch(url, {
+        const resp = await this.debugFetch(url, {
             method: 'POST',
             headers: { ...this.getAuthHeader(), 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -545,7 +640,7 @@ export class ConfluenceClient {
                     };
                     updateUrl = `${this.baseUrl}/api/v2/pages/${pageId}`;
                 }
-                const updateResp = await fetch(updateUrl, {
+                const updateResp = await this.debugFetch(updateUrl, {
                     method: 'PUT',
                     headers: { ...this.getAuthHeader(), 'Content-Type': 'application/json' },
                     body: JSON.stringify(updatePayload)
@@ -613,7 +708,7 @@ export class ConfluenceClient {
             };
             url = `${this.baseUrl}/api/v2/pages/${pageId}`;
         }
-        const resp = await fetch(url, {
+        const resp = await this.debugFetch(url, {
             method: 'PUT',
             headers: { ...this.getAuthHeader(), 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -625,14 +720,13 @@ export class ConfluenceClient {
     }
 
     async setPageLabels(pageId: string, labels: string[]): Promise<any> {
-        const { default: fetch } = await import('node-fetch');
         if (!Array.isArray(labels) || !labels.every(l => typeof l === 'string')) {
             throw new Error('labels must be a list of strings');
         }
         const payload = labels.map(label => ({ prefix: 'global', name: label }));
         const baseUrlV1 = this.getBaseUrlV1();
         const url = `${baseUrlV1}/rest/api/content/${pageId}/label`;
-        const resp = await fetch(url, {
+        const resp = await this.debugFetch(url, {
             method: 'POST',
             headers: { ...this.getAuthHeader(), 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -642,22 +736,20 @@ export class ConfluenceClient {
     }
 
     async getContentProperties(pageId: string): Promise<any[]> {
-        const { default: fetch } = await import('node-fetch');
         const baseUrlV1 = this.getBaseUrlV1();
         const url = `${baseUrlV1}/rest/api/content/${pageId}/property`;
-        const resp = await fetch(url, { headers: this.getAuthHeader() });
+        const resp = await this.debugFetch(url, { headers: this.getAuthHeader() });
         if (!resp.ok) {throw new Error(await resp.text());}
         const data = await resp.json() as any;
         return data.results || [];
     }
 
     async updateContentProperty(pageId: string, key: string, value: any): Promise<any> {
-        const { default: fetch } = await import('node-fetch');
         const baseUrlV1 = this.getBaseUrlV1();
         const url = `${baseUrlV1}/rest/api/content/${pageId}/property/${key}`;
         // Buscar a versão atual da propriedade (se existir)
         let versionNumber = 1;
-        const respGet = await fetch(url, { headers: this.getAuthHeader() });
+        const respGet = await this.debugFetch(url, { headers: this.getAuthHeader() });
         if (respGet.status === 200) {
             const prop = await respGet.json() as any;
             versionNumber = (prop.version?.number || 1) + 1;
@@ -667,7 +759,7 @@ export class ConfluenceClient {
             value,
             version: { number: versionNumber }
         };
-        const resp = await fetch(url, {
+        const resp = await this.debugFetch(url, {
             method: 'PUT',
             headers: { ...this.getAuthHeader(), 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)

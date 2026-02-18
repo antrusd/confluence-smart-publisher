@@ -2,7 +2,7 @@
   "name": "confluence-smart-publisher",
   "displayName": "Confluence Smart Publisher",
   "description": "Publish and manage Confluence pages directly from VS Code",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "icon": "images/csp-icon.png",
   "engines": {
     "vscode": "^1.99.0"
@@ -193,6 +193,11 @@
             "YAML format - Uses YAML with block scalar (|) for the content field, making XHTML content more readable and editable in multiline format."
           ],
           "description": "Choose the file format for .confluence files when downloading pages. Both formats are supported for publishing."
+        },
+        "confluenceSmartPublisher.debug": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable debug logging of HTTP requests and responses in the Output channel. Useful for troubleshooting API issues."
         }
       }
     },

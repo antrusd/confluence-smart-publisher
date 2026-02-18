@@ -2,6 +2,16 @@
 
 All notable changes to the "confluence-smart-publisher" extension will be documented in this file.
 
+## [0.4.6] - 2026-02-18
+### Bug Fix
+- **🐛 Non-blocking Label/Property Operations**: Fixed 500 Internal Server Error during publish caused by DELETE label/property operations failing due to insufficient permissions. These operations are now best-effort — failures are logged as `[WARN]` in the Output channel but no longer block the publish workflow.
+
+### New Features
+- **🔍 Debug HTTP Logging**: Added `confluenceSmartPublisher.debug` configuration option to log all HTTP requests and responses to the "Confluence Smart Publisher" Output channel
+  - Logs method, URL, sanitized headers, request body preview, response status, and elapsed time
+  - Centralized all HTTP calls through a `debugFetch()` wrapper
+  - Added `warnLog()` method for warnings that always appear regardless of debug mode
+
 ## [0.4.5] - 2026-02-18
 ### Bug Fix
 - **🐛 XHTML Parsing Error on Publish**: Fixed `"Unexpected character '\\' (code 92) in start tag"` error when publishing `.confluence` files. The entire JSON file was being sent as the XHTML body instead of extracting just the `content` field. Added `extractStorageContent()` method that properly parses JSON/YAML wrappers and extracts the XHTML content string.
