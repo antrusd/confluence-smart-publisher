@@ -33,19 +33,19 @@ export class MarkdownConverter {
         try {
             // Read the Markdown file content
             const markdownContent = await fs.readFile(markdownFilePath, 'utf8');
-            
+
             // Convert content to HTML using marked
             const htmlContent = marked.parse(markdownContent) as string;
-            
+
             // Convert HTML to Confluence Storage Format
             const confluenceContent = await this.convertHtmlToConfluence(htmlContent);
-            
+
             // Generate the new file path
             const confluenceFilePath = this.generateConfluenceFilePath(markdownFilePath);
-            
+
             // Save the converted file
             await fs.writeFile(confluenceFilePath, confluenceContent, 'utf8');
-            
+
             return confluenceFilePath;
         } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -76,7 +76,8 @@ export class MarkdownConverter {
     }
 
     /**
-     * Converts HTML <pre><code> blocks to Confluence ac:structured-macro code blocks.
+     * Converts HTML <pre><code> blocks to Confluence ac:structured-macro markdown blocks.
+     * Uses the "markdown" macro with the original fenced code block (triple backticks) preserved inside CDATA.
      * Handles both language-specific (<code class="language-xxx">) and plain (<code>) blocks.
      * HTML entities inside code content are unescaped since the content goes inside CDATA.
      */
@@ -90,10 +91,10 @@ export class MarkdownConverter {
             // Remove trailing newline that marked adds before </code>
             const trimmedContent = rawContent.endsWith('\n') ? rawContent.slice(0, -1) : rawContent;
             const macroId = randomUUID();
-            const languageParam = language
-                ? `<ac:parameter ac:name="language">${language}</ac:parameter>`
-                : '';
-            return `<ac:structured-macro ac:name="code" ac:schema-version="1" ac:macro-id="${macroId}">${languageParam}<ac:plain-text-body><![CDATA[${trimmedContent}]]></ac:plain-text-body></ac:structured-macro>`;
+            // Reconstruct the fenced code block with triple backticks inside CDATA
+            const langSpec = language || '';
+            const fencedBlock = `\`\`\`${langSpec}\n${trimmedContent}\n\`\`\``;
+            return `<ac:structured-macro ac:name="markdown" ac:schema-version="1" ac:macro-id="${macroId}"><ac:plain-text-body><![CDATA[${fencedBlock}]]></ac:plain-text-body></ac:structured-macro>`;
         });
     }
 
@@ -119,4 +120,4 @@ export class MarkdownConverter {
         const baseName = path.basename(markdownFilePath, '.md');
         return path.join(dirName, `${baseName}.confluence`);
     }
-} 
+}
