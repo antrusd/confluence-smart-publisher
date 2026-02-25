@@ -2,7 +2,7 @@
   "name": "confluence-smart-publisher",
   "displayName": "Confluence Smart Publisher",
   "description": "Publish and manage Confluence pages directly from VS Code",
-  "version": "0.4.7",
+  "version": "0.4.8",
   "icon": "images/csp-icon.png",
   "engines": {
     "vscode": "^1.99.0"
@@ -57,6 +57,14 @@
       {
         "command": "confluence-smart-publisher.preview",
         "title": "Open Markdown Preview"
+      },
+      {
+        "command": "confluence-smart-publisher.previewConfluence",
+        "title": "Open Confluence Preview",
+        "icon": {
+          "light": "./icons/preview-light.svg",
+          "dark": "./icons/preview-dark.svg"
+        }
       }
     ],
     "submenus": [
@@ -117,9 +125,28 @@
         {
           "command": "confluence-smart-publisher.preview",
           "when": "resourceExtname == .md"
+        },
+        {
+          "command": "confluence-smart-publisher.previewConfluence",
+          "when": "resourceExtname == .confluence"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "confluence-smart-publisher.previewConfluence",
+          "when": "editorLangId == confluence",
+          "group": "navigation"
         }
       ]
     },
+    "keybindings": [
+      {
+        "command": "confluence-smart-publisher.previewConfluence",
+        "key": "ctrl+shift+v",
+        "mac": "cmd+shift+v",
+        "when": "editorLangId == confluence"
+      }
+    ],
     "configuration": {
       "title": "Confluence Smart Publisher",
       "properties": {
@@ -270,6 +297,7 @@
     "@emoji-mart/react": "^1.1.1",
     "@types/turndown": "^5.0.5",
     "@vscode/vsce": "^3.7.1",
+    "cheerio": "^1.2.0",
     "emoji-mart": "^5.4.0",
     "entities": "^6.0.0",
     "form-data": "^4.0.0",

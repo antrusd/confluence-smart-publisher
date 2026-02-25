@@ -7,6 +7,7 @@ import { MarkdownConverter } from './markdownConverter';
 import { AdfToMarkdownConverter } from './adf-md-converter/adf-to-md-converter';
 import { createXMLCSPBlock, createYAMLCSPBlock, extractFileId } from './csp-utils';
 import { PreviewPanel } from './preview/PreviewPanel';
+import { ConfluencePreviewPanel } from './preview/ConfluencePreviewPanel';
 
 export function registerCommands(context: vscode.ExtensionContext, outputChannel: vscode.OutputChannel) {
     // Command to publish .confluence file
@@ -329,7 +330,7 @@ export function registerCommands(context: vscode.ExtensionContext, outputChannel
                         const cspPropertiesRegex = /<csp:properties>[\s\S]*?<\/csp:properties>/i;
                         const emojiKeysRegex = /<csp:key>emoji-title-draft<\/csp:key>\s*<csp:value>[a-zA-Z0-9]+<\/csp:value>\s*<csp:key>emoji-title-published<\/csp:key>\s*<csp:value>[a-zA-Z0-9]+<\/csp:value>/;
                         const emojiProps = `<csp:key>emoji-title-draft</csp:key>\n  <csp:value>${codePoint}</csp:value>\n  <csp:key>emoji-title-published</csp:key>\n  <csp:value>${codePoint}</csp:value>`;
-                        
+
                         let novoContent = content;
                         if (cspParamsRegex.test(content)) {
                             novoContent = content.replace(cspParamsRegex, (paramsBlock) => {
@@ -385,7 +386,7 @@ export function registerCommands(context: vscode.ExtensionContext, outputChannel
         try {
             const document = await vscode.workspace.openTextDocument(uri);
             const editor = await vscode.window.showTextDocument(document, { preview: false });
-            
+
             const content = document.getText();
             const decodedContent = decodeHtmlEntities(content);
 
@@ -422,7 +423,7 @@ export function registerCommands(context: vscode.ExtensionContext, outputChannel
                 const confluenceFilePath = await converter.convertFile(uri.fsPath);
                 outputChannel.appendLine(`[Convert] File successfully converted: "${path.basename(confluenceFilePath)}"`);
                 vscode.window.showInformationMessage(`File successfully converted: "${path.basename(confluenceFilePath)}"`);
-                
+
                 // Opens the converted file
                 const doc = await vscode.workspace.openTextDocument(confluenceFilePath);
                 await vscode.window.showTextDocument(doc);
@@ -518,6 +519,19 @@ ${markdown.trim()}
         }
     });
 
+    // Command to open confluence preview
+    const previewConfluenceCmd = vscode.commands.registerCommand('confluence-smart-publisher.previewConfluence', () => {
+        try {
+            outputChannel.appendLine('[Confluence Preview] Opening Confluence preview...');
+            ConfluencePreviewPanel.createOrShow(context.extensionUri, outputChannel);
+            outputChannel.appendLine('[Confluence Preview] Confluence preview opened successfully');
+        } catch (e: any) {
+            outputChannel.appendLine(`[Confluence Preview] Error: ${e.message || e}`);
+            outputChannel.show(true);
+            vscode.window.showErrorMessage(`Error opening Confluence preview: ${e.message || e}`);
+        }
+    });
+
     // Register all commands
     context.subscriptions.push(
         publishCmd,
@@ -530,6 +544,7 @@ ${markdown.trim()}
         decodeHtmlCmd,
         convertMarkdownCmd,
         convertConfluenceToMarkdownCmd,
-        previewCmd
+        previewCmd,
+        previewConfluenceCmd
     );
-} 
+}

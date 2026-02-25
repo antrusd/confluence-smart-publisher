@@ -65,4 +65,5 @@ docs-for-testing/
 # Pacote da extensão
 *.vsix
 
-*.confluence
+/plans/
+/references/

@@ -1,0 +1,978 @@
+/* ============================================
+   Confluence Preview — Confluence-Themed CSS
+   ============================================ */
+
+/* CSS Custom Properties — Dark Theme (default) */
+:root {
+    --confluence-bg: #1e1e1e;
+    --confluence-fg: rgba(255, 255, 255, 0.87);
+    --confluence-fg-light: rgba(255, 255, 255, 0.54);
+    --confluence-fg-lighter: rgba(255, 255, 255, 0.32);
+    --confluence-surface: #2d2d2d;
+    --confluence-surface-light: #3c3c3c;
+    --confluence-border: rgba(255, 255, 255, 0.12);
+    --confluence-link: #82b1ff;
+    --confluence-link-hover: #adc5ff;
+    --confluence-code-bg: #0d1117;
+    --confluence-code-fg: #e6edf3;
+    --confluence-inline-code-bg: #404040;
+    --confluence-inline-code-fg: #e1e1e1;
+
+    /* Panel colors */
+    --confluence-info-bg: rgba(0, 82, 204, 0.12);
+    --confluence-info-border: #0052cc;
+    --confluence-info-icon: #4c9aff;
+    --confluence-note-bg: rgba(101, 84, 192, 0.12);
+    --confluence-note-border: #6554c0;
+    --confluence-note-icon: #998dd9;
+    --confluence-warning-bg: rgba(255, 171, 0, 0.12);
+    --confluence-warning-border: #ffab00;
+    --confluence-warning-icon: #ffc400;
+    --confluence-tip-bg: rgba(0, 135, 90, 0.12);
+    --confluence-tip-border: #00875a;
+    --confluence-tip-icon: #36b37e;
+    --confluence-error-bg: rgba(222, 53, 11, 0.12);
+    --confluence-error-border: #de350b;
+    --confluence-error-icon: #ff5630;
+}
+
+/* Light Theme — auto-detected via VS Code's body class */
+body.vscode-light {
+    --confluence-bg: #ffffff;
+    --confluence-fg: #172b4d;
+    --confluence-fg-light: #6b778c;
+    --confluence-fg-lighter: #97a0af;
+    --confluence-surface: #f4f5f7;
+    --confluence-surface-light: #ebecf0;
+    --confluence-border: #dfe1e6;
+    --confluence-link: #0052cc;
+    --confluence-link-hover: #0065ff;
+    --confluence-code-bg: #f4f5f7;
+    --confluence-code-fg: #172b4d;
+    --confluence-inline-code-bg: #f4f5f7;
+    --confluence-inline-code-fg: #e53e3e;
+
+    /* Panel colors — light theme */
+    --confluence-info-bg: #deebff;
+    --confluence-info-border: #0052cc;
+    --confluence-info-icon: #0052cc;
+    --confluence-note-bg: #eae6ff;
+    --confluence-note-border: #6554c0;
+    --confluence-note-icon: #6554c0;
+    --confluence-warning-bg: #fffae6;
+    --confluence-warning-border: #ff8b00;
+    --confluence-warning-icon: #ff8b00;
+    --confluence-tip-bg: #e3fcef;
+    --confluence-tip-border: #00875a;
+    --confluence-tip-icon: #00875a;
+    --confluence-error-bg: #ffebe6;
+    --confluence-error-border: #de350b;
+    --confluence-error-icon: #de350b;
+}
+
+/* ============================================
+   Base Layout
+   ============================================ */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.714;
+    color: var(--confluence-fg);
+    background-color: var(--confluence-bg);
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.confluence-preview {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 24px 32px;
+}
+
+/* ============================================
+   Metadata Header
+   ============================================ */
+.confluence-metadata {
+    background: var(--confluence-surface);
+    border: 1px solid var(--confluence-border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    font-size: 13px;
+}
+
+.confluence-metadata__title {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--confluence-fg);
+    margin: 0 0 12px 0;
+    line-height: 1.3;
+}
+
+.confluence-metadata__row {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    color: var(--confluence-fg-light);
+}
+
+.confluence-metadata__item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.confluence-metadata__label {
+    font-weight: 600;
+    color: var(--confluence-fg-lighter);
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+}
+
+.confluence-metadata__value {
+    color: var(--confluence-fg-light);
+    font-family: monospace;
+}
+
+.confluence-metadata__labels {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.confluence-metadata__tag {
+    background: var(--confluence-surface-light);
+    color: var(--confluence-link);
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+/* ============================================
+   Typography
+   ============================================ */
+h1, h2, h3, h4, h5, h6 {
+    color: var(--confluence-fg);
+    font-weight: 600;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    line-height: 1.3;
+}
+
+h1 { font-size: 1.714em; }
+h2 { font-size: 1.429em; border-bottom: 1px solid var(--confluence-border); padding-bottom: 0.3em; }
+h3 { font-size: 1.143em; }
+h4 { font-size: 1em; }
+h5 { font-size: 0.857em; }
+h6 { font-size: 0.786em; color: var(--confluence-fg-light); }
+
+p {
+    margin: 0.75em 0;
+    line-height: 1.714;
+}
+
+a {
+    color: var(--confluence-link);
+    text-decoration: none;
+}
+
+a:hover {
+    color: var(--confluence-link-hover);
+    text-decoration: underline;
+}
+
+strong, b {
+    font-weight: 600;
+}
+
+em, i {
+    font-style: italic;
+}
+
+hr {
+    border: none;
+    border-top: 1px solid var(--confluence-border);
+    margin: 1.5em 0;
+}
+
+blockquote {
+    border-left: 3px solid var(--confluence-border);
+    margin: 1em 0;
+    padding: 0.5em 1em;
+    color: var(--confluence-fg-light);
+    background: var(--confluence-surface);
+    border-radius: 0 4px 4px 0;
+}
+
+/* ============================================
+   Lists
+   ============================================ */
+ul, ol {
+    margin: 0.5em 0;
+    padding-left: 2em;
+}
+
+li {
+    margin: 0.25em 0;
+    line-height: 1.714;
+}
+
+li > ul, li > ol {
+    margin: 0;
+}
+
+/* Task lists */
+.task-list {
+    list-style: none;
+    padding-left: 0;
+}
+
+.task-list-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 4px 0;
+}
+
+.task-list-item input[type="checkbox"] {
+    margin-top: 4px;
+    accent-color: var(--confluence-link);
+}
+
+/* ============================================
+   Inline Code
+   ============================================ */
+code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.857em;
+    background: var(--confluence-inline-code-bg);
+    color: var(--confluence-inline-code-fg);
+    padding: 0.125em 0.375em;
+    border-radius: 3px;
+    word-break: break-word;
+}
+
+pre code {
+    background: none;
+    padding: 0;
+    border-radius: 0;
+    font-size: 1em;
+    word-break: normal;
+}
+
+/* ============================================
+   Code Blocks
+   ============================================ */
+.confluence-code-block {
+    position: relative;
+    margin: 1em 0;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--confluence-code-bg);
+    border: 1px solid var(--confluence-border);
+}
+
+.confluence-code-block__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid var(--confluence-border);
+    font-size: 12px;
+}
+
+.confluence-code-block__language {
+    color: var(--confluence-fg-light);
+    font-family: monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.confluence-code-block__title {
+    color: var(--confluence-fg-lighter);
+    font-size: 12px;
+}
+
+.confluence-code-block pre {
+    margin: 0;
+    padding: 16px;
+    overflow-x: auto;
+    background: var(--confluence-code-bg);
+    color: var(--confluence-code-fg);
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    tab-size: 4;
+}
+
+.confluence-code-block pre code {
+    color: var(--confluence-code-fg);
+}
+
+/* Plain pre (no wrapper) */
+pre {
+    margin: 1em 0;
+    padding: 16px;
+    overflow-x: auto;
+    background: var(--confluence-code-bg);
+    color: var(--confluence-code-fg);
+    border-radius: 6px;
+    border: 1px solid var(--confluence-border);
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+/* ============================================
+   Tables
+   ============================================ */
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1em 0;
+    font-size: 14px;
+    overflow-x: auto;
+    display: block;
+}
+
+table.fixed-width {
+    display: table;
+}
+
+table.wrapped {
+    display: table;
+    table-layout: auto;
+}
+
+thead {
+    border-bottom: 2px solid var(--confluence-border);
+}
+
+th {
+    background: var(--confluence-surface);
+    font-weight: 600;
+    text-align: left;
+    padding: 8px 12px;
+    border: 1px solid var(--confluence-border);
+    color: var(--confluence-fg);
+}
+
+td {
+    padding: 8px 12px;
+    border: 1px solid var(--confluence-border);
+    vertical-align: top;
+}
+
+tr:nth-child(even) td {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+tr:hover td {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* Table with highlighted header */
+th[scope="col"] {
+    background: var(--confluence-surface-light);
+}
+
+colgroup {
+    display: table-column-group;
+}
+
+col {
+    display: table-column;
+}
+
+/* ============================================
+   Confluence Panels (Info/Note/Warning/Tip/Error)
+   ============================================ */
+.confluence-panel {
+    margin: 1em 0;
+    padding: 16px 20px;
+    border-left: 4px solid;
+    border-radius: 0 4px 4px 0;
+    position: relative;
+}
+
+.confluence-panel__icon {
+    position: absolute;
+    top: 16px;
+    left: -14px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    background: var(--confluence-bg);
+}
+
+.confluence-panel__title {
+    font-weight: 600;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.confluence-panel__body {
+    line-height: 1.714;
+}
+
+.confluence-panel__body p:first-child {
+    margin-top: 0;
+}
+
+.confluence-panel__body p:last-child {
+    margin-bottom: 0;
+}
+
+/* Info panel */
+.confluence-panel--info {
+    background: var(--confluence-info-bg);
+    border-color: var(--confluence-info-border);
+}
+
+.confluence-panel--info .confluence-panel__icon {
+    color: var(--confluence-info-icon);
+}
+
+.confluence-panel--info .confluence-panel__title {
+    color: var(--confluence-info-icon);
+}
+
+/* Note panel */
+.confluence-panel--note {
+    background: var(--confluence-note-bg);
+    border-color: var(--confluence-note-border);
+}
+
+.confluence-panel--note .confluence-panel__icon {
+    color: var(--confluence-note-icon);
+}
+
+.confluence-panel--note .confluence-panel__title {
+    color: var(--confluence-note-icon);
+}
+
+/* Warning panel */
+.confluence-panel--warning {
+    background: var(--confluence-warning-bg);
+    border-color: var(--confluence-warning-border);
+}
+
+.confluence-panel--warning .confluence-panel__icon {
+    color: var(--confluence-warning-icon);
+}
+
+.confluence-panel--warning .confluence-panel__title {
+    color: var(--confluence-warning-icon);
+}
+
+/* Tip panel */
+.confluence-panel--tip {
+    background: var(--confluence-tip-bg);
+    border-color: var(--confluence-tip-border);
+}
+
+.confluence-panel--tip .confluence-panel__icon {
+    color: var(--confluence-tip-icon);
+}
+
+.confluence-panel--tip .confluence-panel__title {
+    color: var(--confluence-tip-icon);
+}
+
+/* Error panel */
+.confluence-panel--error {
+    background: var(--confluence-error-bg);
+    border-color: var(--confluence-error-border);
+}
+
+.confluence-panel--error .confluence-panel__icon {
+    color: var(--confluence-error-icon);
+}
+
+.confluence-panel--error .confluence-panel__title {
+    color: var(--confluence-error-icon);
+}
+
+/* ============================================
+   Expand / Collapse Sections
+   ============================================ */
+details.confluence-expand {
+    margin: 1em 0;
+    border: 1px solid var(--confluence-border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+details.confluence-expand summary {
+    padding: 10px 16px;
+    background: var(--confluence-surface);
+    cursor: pointer;
+    font-weight: 500;
+    color: var(--confluence-link);
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+details.confluence-expand summary::before {
+    content: "▶";
+    font-size: 10px;
+    transition: transform 0.15s ease;
+    display: inline-block;
+}
+
+details.confluence-expand[open] summary::before {
+    transform: rotate(90deg);
+}
+
+details.confluence-expand summary:hover {
+    background: var(--confluence-surface-light);
+}
+
+details.confluence-expand summary::marker,
+details.confluence-expand summary::-webkit-details-marker {
+    display: none;
+}
+
+details.confluence-expand .confluence-expand__body {
+    padding: 16px;
+    border-top: 1px solid var(--confluence-border);
+}
+
+/* ============================================
+   Status Badges
+   ============================================ */
+.confluence-status {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    vertical-align: middle;
+}
+
+.confluence-status--grey {
+    background: rgba(107, 119, 140, 0.2);
+    color: #b3bac5;
+}
+
+.confluence-status--blue {
+    background: rgba(0, 82, 204, 0.2);
+    color: #4c9aff;
+}
+
+.confluence-status--green {
+    background: rgba(0, 135, 90, 0.2);
+    color: #36b37e;
+}
+
+.confluence-status--yellow {
+    background: rgba(255, 171, 0, 0.2);
+    color: #ffc400;
+}
+
+.confluence-status--red {
+    background: rgba(222, 53, 11, 0.2);
+    color: #ff5630;
+}
+
+.confluence-status--purple {
+    background: rgba(101, 84, 192, 0.2);
+    color: #998dd9;
+}
+
+/* ============================================
+   Images
+   ============================================ */
+img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+}
+
+.confluence-image-wrapper {
+    margin: 1em 0;
+    text-align: center;
+}
+
+/* ============================================
+   TOC Placeholder
+   ============================================ */
+.confluence-toc {
+    background: var(--confluence-surface);
+    border: 1px solid var(--confluence-border);
+    border-radius: 4px;
+    padding: 16px;
+    margin: 1em 0;
+    color: var(--confluence-fg-light);
+    font-style: italic;
+    font-size: 13px;
+}
+
+.confluence-toc::before {
+    content: "📋 ";
+}
+
+/* ============================================
+   Emoticons / Emoji
+   ============================================ */
+.confluence-emoticon {
+    font-size: 1.2em;
+    vertical-align: middle;
+}
+
+/* ============================================
+   Layout Sections
+   ============================================ */
+.confluence-layout-section {
+    display: flex;
+    gap: 16px;
+    margin: 1em 0;
+}
+
+.confluence-layout-cell {
+    flex: 1;
+    min-width: 0;
+}
+
+/* ============================================
+   Misc / Utility
+   ============================================ */
+.confluence-unknown-macro {
+    background: var(--confluence-surface);
+    border: 1px dashed var(--confluence-border);
+    border-radius: 4px;
+    padding: 12px 16px;
+    margin: 1em 0;
+    color: var(--confluence-fg-light);
+    font-size: 13px;
+}
+
+.confluence-unknown-macro__name {
+    font-weight: 600;
+    color: var(--confluence-fg);
+    margin-bottom: 4px;
+}
+
+/* Span with color style */
+span[style*="color"] {
+    /* Allow inline color styles to pass through */
+}
+
+/* Empty paragraphs (used as spacers in Confluence) */
+p:empty, p > br:only-child {
+    min-height: 1em;
+}
+
+/* ============================================
+   Welcome / Error Screens
+   ============================================ */
+.confluence-welcome,
+.confluence-error {
+    max-width: 600px;
+    margin: 60px auto;
+    padding: 2rem;
+    background: var(--confluence-surface);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    text-align: center;
+}
+
+.confluence-welcome__icon,
+.confluence-error__icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+.confluence-welcome h1 {
+    color: var(--confluence-link);
+    margin-bottom: 1rem;
+    border-bottom: none;
+}
+
+.confluence-error h2 {
+    color: var(--confluence-error-icon);
+    margin-bottom: 1rem;
+    border-bottom: none;
+}
+
+.confluence-error__details {
+    background-color: rgba(222, 53, 11, 0.1);
+    padding: 1rem;
+    border-radius: 4px;
+    margin-top: 1rem;
+    font-family: monospace;
+    text-align: left;
+    color: #ff8a80;
+    font-size: 13px;
+}
+
+.confluence-welcome__tip {
+    background-color: var(--confluence-surface-light);
+    padding: 1rem;
+    border-radius: 4px;
+    margin-top: 1rem;
+    font-style: italic;
+    color: var(--confluence-fg-light);
+}
+
+/* ============================================
+   Highlight.js Integration (GitHub Dark Theme)
+   ============================================ */
+.hljs {
+    color: #e6edf3;
+    background: #0d1117;
+}
+
+.hljs-doctag,
+.hljs-keyword,
+.hljs-meta .hljs-keyword,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-type,
+.hljs-variable.language_ {
+    color: #ff7b72;
+}
+
+.hljs-title,
+.hljs-title.class_,
+.hljs-title.class_.inherited__,
+.hljs-title.function_ {
+    color: #d2a8ff;
+}
+
+.hljs-attr,
+.hljs-attribute,
+.hljs-literal,
+.hljs-meta,
+.hljs-number,
+.hljs-operator,
+.hljs-variable,
+.hljs-selector-attr,
+.hljs-selector-class,
+.hljs-selector-id {
+    color: #79c0ff;
+}
+
+.hljs-regexp,
+.hljs-string,
+.hljs-meta .hljs-string {
+    color: #a5d6ff;
+}
+
+.hljs-built_in,
+.hljs-symbol {
+    color: #ffa657;
+}
+
+.hljs-comment,
+.hljs-code,
+.hljs-formula {
+    color: #8b949e;
+}
+
+.hljs-name,
+.hljs-quote,
+.hljs-selector-tag,
+.hljs-selector-pseudo {
+    color: #7ee787;
+}
+
+.hljs-subst {
+    color: #e6edf3;
+}
+
+.hljs-section {
+    color: #1f6feb;
+    font-weight: bold;
+}
+
+.hljs-bullet {
+    color: #f2cc60;
+}
+
+.hljs-emphasis {
+    color: #e6edf3;
+    font-style: italic;
+}
+
+.hljs-strong {
+    color: #e6edf3;
+    font-weight: bold;
+}
+
+.hljs-addition {
+    color: #aff5b4;
+    background-color: #033a16;
+}
+
+.hljs-deletion {
+    color: #ffdcd7;
+    background-color: #67060c;
+}
+
+/* Language-specific enhancements */
+.hljs.language-sql .hljs-keyword {
+    font-weight: bold;
+}
+
+.hljs.language-json .hljs-attr {
+    color: #79c0ff;
+}
+
+.hljs.language-xml .hljs-tag {
+    color: #7ee787;
+}
+
+.hljs-meta,
+.hljs-comment {
+    font-style: italic;
+}
+
+/* ============================================
+   Scrollbar Styling
+   ============================================ */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+/* ============================================
+   Light Theme — Highlight.js (GitHub Light)
+   ============================================ */
+body.vscode-light .hljs {
+    color: #24292e;
+    background: #f6f8fa;
+}
+
+body.vscode-light .hljs-doctag,
+body.vscode-light .hljs-keyword,
+body.vscode-light .hljs-meta .hljs-keyword,
+body.vscode-light .hljs-template-tag,
+body.vscode-light .hljs-template-variable,
+body.vscode-light .hljs-type,
+body.vscode-light .hljs-variable.language_ {
+    color: #d73a49;
+}
+
+body.vscode-light .hljs-title,
+body.vscode-light .hljs-title.class_,
+body.vscode-light .hljs-title.class_.inherited__,
+body.vscode-light .hljs-title.function_ {
+    color: #6f42c1;
+}
+
+body.vscode-light .hljs-attr,
+body.vscode-light .hljs-attribute,
+body.vscode-light .hljs-literal,
+body.vscode-light .hljs-meta,
+body.vscode-light .hljs-number,
+body.vscode-light .hljs-operator,
+body.vscode-light .hljs-variable,
+body.vscode-light .hljs-selector-attr,
+body.vscode-light .hljs-selector-class,
+body.vscode-light .hljs-selector-id {
+    color: #005cc5;
+}
+
+body.vscode-light .hljs-regexp,
+body.vscode-light .hljs-string,
+body.vscode-light .hljs-meta .hljs-string {
+    color: #032f62;
+}
+
+body.vscode-light .hljs-built_in,
+body.vscode-light .hljs-symbol {
+    color: #e36209;
+}
+
+body.vscode-light .hljs-comment,
+body.vscode-light .hljs-code,
+body.vscode-light .hljs-formula {
+    color: #6a737d;
+}
+
+body.vscode-light .hljs-name,
+body.vscode-light .hljs-quote,
+body.vscode-light .hljs-selector-tag,
+body.vscode-light .hljs-selector-pseudo {
+    color: #22863a;
+}
+
+body.vscode-light .hljs-subst {
+    color: #24292e;
+}
+
+body.vscode-light .hljs-section {
+    color: #005cc5;
+    font-weight: bold;
+}
+
+body.vscode-light .hljs-bullet {
+    color: #735c0f;
+}
+
+body.vscode-light .hljs-emphasis {
+    color: #24292e;
+    font-style: italic;
+}
+
+body.vscode-light .hljs-strong {
+    color: #24292e;
+    font-weight: bold;
+}
+
+body.vscode-light .hljs-addition {
+    color: #22863a;
+    background-color: #f0fff4;
+}
+
+body.vscode-light .hljs-deletion {
+    color: #b31d28;
+    background-color: #ffeef0;
+}
+
+/* Light theme scrollbar */
+body.vscode-light ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+}
+
+body.vscode-light ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.25);
+}
+
+/* Light theme heading border */
+body.vscode-light h2 {
+    border-bottom-color: var(--confluence-border);
+}
