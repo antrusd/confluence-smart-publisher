@@ -94,16 +94,16 @@ export function createYAMLConfluenceBlock(metadata: CSPMetadata, content?: strin
         return cspYaml;
     }
 
-    // Force block literal style (|) for content field by manually constructing it.
-    // Ensure content ends with a newline so YAML block scalar is well-formed.
-    const contentValue = content.endsWith('\n') ? content : content + '\n';
+    // Force block literal strip style (|-) for content field by manually constructing it.
+    // Strip style removes trailing newlines, keeping the content clean.
+    const contentValue = content.endsWith('\n') ? content.slice(0, -1) : content;
     // Indent each line of content by 2 spaces for YAML block scalar
     const indentedContent = contentValue
         .split('\n')
         .map(line => line.length > 0 ? '  ' + line : '')
         .join('\n');
 
-    return cspYaml + 'content: |\n' + indentedContent;
+    return cspYaml + 'content: |-\n' + indentedContent + '\n';
 }
 
 /**
@@ -113,7 +113,7 @@ export function createYAMLConfluenceBlock(metadata: CSPMetadata, content?: strin
  */
 export function createYAMLCSPBlock(metadata: CSPMetadata): string {
     const yamlLines: string[] = ['---'];
-    
+
     // Add required fields first
     if (metadata.file_id) {
         yamlLines.push(`file_id: "${metadata.file_id}"`);
@@ -124,7 +124,7 @@ export function createYAMLCSPBlock(metadata: CSPMetadata): string {
     if (metadata.parent_id) {
         yamlLines.push(`parent_id: "${metadata.parent_id}"`);
     }
-    
+
     // Add properties
     if (metadata.properties && metadata.properties.length > 0) {
         yamlLines.push('properties:');
@@ -133,7 +133,7 @@ export function createYAMLCSPBlock(metadata: CSPMetadata): string {
             yamlLines.push(`    value: "${prop.value}"`);
         });
     }
-    
+
     // Add other custom fields
     Object.keys(metadata).forEach(key => {
         if (!['file_id', 'labels_list', 'parent_id', 'properties'].includes(key)) {
@@ -152,7 +152,7 @@ export function createYAMLCSPBlock(metadata: CSPMetadata): string {
             }
         }
     });
-    
+
     yamlLines.push('---');
     return yamlLines.join('\n');
 }
@@ -164,7 +164,7 @@ export function createYAMLCSPBlock(metadata: CSPMetadata): string {
  */
 export function createXMLCSPBlock(metadata: CSPMetadata): string {
     const properties = metadata.properties || [];
-    const propertiesXML = properties.map(prop => 
+    const propertiesXML = properties.map(prop =>
         `    <csp:key>${prop.key}</csp:key>\n    <csp:value>${prop.value}</csp:value>`
     ).join('\n');
 
@@ -211,25 +211,25 @@ export function extractCSPFromJSON(jsonContent: string): CSPMetadata | null {
 export function extractCSPFromYAML(markdownContent: string): CSPMetadata | null {
     const yamlMatch = markdownContent.match(/^---\n([\s\S]*?)\n---/);
     if (!yamlMatch) {return null;}
-    
+
     try {
         // Simple YAML parsing implementation
         const yamlLines = yamlMatch[1].split('\n');
         const metadata: CSPMetadata = {};
-        
+
         for (const line of yamlLines) {
             const trimmed = line.trim();
             if (!trimmed || trimmed.startsWith('#')) {continue;}
-            
+
             const colonIndex = trimmed.indexOf(':');
             if (colonIndex === -1) {continue;}
-            
+
             const key = trimmed.substring(0, colonIndex).trim();
             const value = trimmed.substring(colonIndex + 1).trim().replace(/^["']|["']$/g, '');
-            
+
             metadata[key] = value;
         }
-        
+
         return metadata;
     } catch {
         return null;
@@ -334,18 +334,18 @@ export function extractCSPValue(content: string, key: string, propertyKey?: stri
     const yamlMatch = content.match(/^---\n([\s\S]*?)\n---/);
     if (yamlMatch) {
         const yamlContent = yamlMatch[1];
-        
+
         if (key === 'properties' && propertyKey) {
             // Extract specific property value from YAML
             const propertiesMatch = yamlContent.match(/^properties:\s*\n((?:\s+-.*\n)*)/m);
             if (propertiesMatch) {
                 const propertiesSection = propertiesMatch[1];
                 const propertyBlocks = propertiesSection.split(/\n\s*-\s*/).filter(block => block.trim());
-                
+
                 for (const block of propertyBlocks) {
                     const keyMatch = block.match(/key:\s*["']?([^"'\n]+)["']?/);
                     const valueMatch = block.match(/value:\s*["']?([^"'\n]+)["']?/);
-                    
+
                     if (keyMatch && valueMatch && keyMatch[1].trim() === propertyKey) {
                         return valueMatch[1].trim();
                     }
@@ -356,15 +356,15 @@ export function extractCSPValue(content: string, key: string, propertyKey?: stri
             // Return all properties from YAML
             const properties: Array<{ key: string; value: string }> = [];
             const propertiesMatch = yamlContent.match(/^properties:\s*\n((?:\s+-.*\n)*)/m);
-            
+
             if (propertiesMatch) {
                 const propertiesSection = propertiesMatch[1];
                 const propertyBlocks = propertiesSection.split(/\n\s*-\s*/).filter(block => block.trim());
-                
+
                 for (const block of propertyBlocks) {
                     const keyMatch = block.match(/key:\s*["']?([^"'\n]+)["']?/);
                     const valueMatch = block.match(/value:\s*["']?([^"'\n]+)["']?/);
-                    
+
                     if (keyMatch && valueMatch) {
                         properties.push({
                             key: keyMatch[1].trim(),
@@ -399,7 +399,7 @@ export function extractCSPValue(content: string, key: string, propertyKey?: stri
             const propContent = xmlPropsMatch[1];
             const keyRegex = /<csp:key>(.*?)<\/csp:key>\s*<csp:value>(.*?)<\/csp:value>/g;
             let keyMatch;
-            
+
             while ((keyMatch = keyRegex.exec(propContent)) !== null) {
                 if (keyMatch[1].trim() === propertyKey) {
                     return keyMatch[2].trim();
@@ -415,7 +415,7 @@ export function extractCSPValue(content: string, key: string, propertyKey?: stri
             const propContent = xmlPropsMatch[1];
             const keyRegex = /<csp:key>(.*?)<\/csp:key>\s*<csp:value>(.*?)<\/csp:value>/g;
             let keyMatch;
-            
+
             while ((keyMatch = keyRegex.exec(propContent)) !== null) {
                 const propKey = keyMatch[1].trim();
                 const propValue = keyMatch[2].trim();
@@ -458,4 +458,4 @@ export function extractProperties(content: string): Array<{ key: string; value: 
  */
 export function extractLabels(content: string): string[] {
     return extractCSPValue(content, 'labels_list') || [];
-} 
+}

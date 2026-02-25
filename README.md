@@ -1,6 +1,6 @@
 # 🚀 Confluence Smart Publisher
 
-Visual Studio Code extension that allows you to create, edit, publish, download, and synchronize Confluence pages directly from your editor, using `.confluence` files in a custom XML format named Confluence Storage Format.
+Visual Studio Code extension that allows you to create, edit, publish, download, and synchronize Confluence pages directly from your editor, using `.confluence` files in Confluence Storage Format with YAML or JSON metadata wrappers.
 
 ## ☕️ Buy me a coffe
 Enjoying the Confluence Smart Publisher extension?
@@ -29,7 +29,8 @@ Formate seus arquivos `.confluence` automaticamente, com numeração de capítul
     - [🛠️ Smart Formatter](#️-smart-formatter)
   - [📋 Table of Contents](#-table-of-contents)
   - [✨ Features](#-features)
-    - [🔍 NEW: Material for MkDocs Live Preview](#-new-material-for-mkdocs-live-preview)
+    - [🔍 NEW: Confluence Storage Format Live Preview](#-new-confluence-storage-format-live-preview)
+    - [🔍 Material for MkDocs Live Preview](#-material-for-mkdocs-live-preview)
     - [🎨 Material for MkDocs Conversion Support](#-material-for-mkdocs-conversion-support)
     - [🎮 Commands](#-commands)
     - [🔄 UNIQUE FEATURE: Metadata synchronization!](#-unique-feature-metadata-synchronization)
@@ -57,9 +58,30 @@ Formate seus arquivos `.confluence` automaticamente, com numeração de capítul
 
 ## ✨ Features
 
-### 🔍 NEW: Material for MkDocs Live Preview
+### 🔍 NEW: Confluence Storage Format Live Preview
 
-The extension now includes a **high-fidelity Markdown preview system** with authentic Material for MkDocs styling:
+The extension includes a **dedicated preview panel for `.confluence` files** that renders Confluence Storage Format content directly in VS Code:
+
+- **📄 Full Confluence Rendering**: Transforms `ac:structured-macro` elements into styled HTML — code blocks, panels, expand sections, status badges, and more
+- **📋 Metadata Display**: Parses YAML/JSON frontmatter (`csp:` block) and displays page title, ID, parent page, and labels in a styled header
+- **💻 Syntax Highlighting**: Code macros rendered with [highlight.js](https://highlightjs.org/) supporting 20+ languages with auto-detection
+- **📝 Panel Macros**: Info, Note, Warning, Tip, and Error panels with Confluence-themed colors and icons
+- **🔽 Expand Sections**: Collapsible `<details>/<summary>` rendering for expand macros
+- **✅ Task Lists**: Checkbox-based task list rendering from `ac:task-list` macros
+- **🏷️ Status Badges**: Colored status badges from `ac:structured-macro[name=status]`
+- **🌗 Theme Auto-Detection**: Automatically adapts to VS Code's active color theme (dark/light) — no manual toggle needed
+- **⚡ Real-Time Updates**: Auto-refresh preview with debounced updates (300ms) as you edit
+- **🔧 Easy Access**: Editor title button, keybinding (`Ctrl+Shift+V` / `Cmd+Shift+V`), context menu, and Command Palette
+
+> **Usage**: Open any `.confluence` file, then either:
+> - Click the preview icon in the editor title bar
+> - Press `Ctrl+Shift+V` (macOS: `Cmd+Shift+V`)
+> - Right-click → "Open Confluence Preview"
+> - Command Palette → "Confluence Smart Publisher: Open Confluence Preview"
+
+### 🔍 Material for MkDocs Live Preview
+
+The extension also includes a **high-fidelity Markdown preview system** with authentic Material for MkDocs styling:
 
 - **🎨 Pixel-Perfect Rendering**: Uses real CSS from mkdocs-material repository (v9.6.15) for authentic visual output
 - **📝 Advanced Admonitions**: Full support for 8 admonition types with proper Material Design colors and icons
@@ -94,6 +116,7 @@ Enhanced support for **Material for MkDocs** format conversion with **CommonMark
 - **Fallback Support**: Unknown panel types gracefully fallback to `note` admonition type
 
 ### 🎮 Commands
+- **🔍 Confluence Preview**: Live preview of `.confluence` files rendering Confluence Storage Format with full macro support, syntax highlighting, and theme auto-detection.
 - **🔍 Markdown Preview**: Live preview of Markdown files with Material for MkDocs styling and admonition support. Perfect for documentation workflows.
 - **Direct publishing**: Publish `.confluence` files as pages on Confluence with a single click. [📚 Documentation](https://antoniocarelli.github.io/confluence-smart-publisher/docs/publish-document)
 - **Page downloading**: Download Confluence pages by title or ID, converting them to local editable format. [📚 Documentation by title](https://antoniocarelli.github.io/confluence-smart-publisher/docs/download-by-title)  [📚 Documentation by id](https://antoniocarelli.github.io/confluence-smart-publisher/docs/download-by-id)
@@ -149,9 +172,9 @@ The Confluence Smart Publisher extension offers several validation and diagnosti
 
 ## ⚙️ Requirements
 
-- VS Code version 1.96.0 or higher.
-- Confluence Cloud (Atlassian) account with edit permission.
-- Confluence API Token (generate at [https://id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)).
+- VS Code version 1.99.0 or higher.
+- Confluence Cloud or Server/Data Center instance with edit permission.
+- Confluence API Token (generate at [https://id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens)) or Bearer token for Server/Data Center.
 
 ## 📥 Installation
 
@@ -174,22 +197,53 @@ This extension adds the following settings to VSCode:
 | `confluenceSmartPublisher.apiToken`              | Confluence API Token                                                                         |
 | `confluenceSmartPublisher.useBearerAuth`         | Use Bearer token authentication instead of Basic authentication. When enabled, the API Token is sent as a Bearer token and the username is not required (default: false) |
 | `confluenceSmartPublisher.confluenceVersion`     | Choose the Confluence deployment type: `cloud` (default) or `server`. Cloud uses v2 API, Server uses v1 REST API |
+| `confluenceSmartPublisher.confluenceFileFormat`  | Choose the file format for `.confluence` files when downloading: `json` (default) or `yaml`. Both formats are supported for publishing |
 | `confluenceSmartPublisher.format.numberChapters` | Automatically numbers chapters when formatting the `.confluence` document (default: true)    |
 | `confluenceSmartPublisher.htmlEntitiesDecode`    | Activates automatic conversion of HTML entities to special characters when downloading pages (default: false) |
 | `confluenceSmartPublisher.mathRenderer`          | Choose the mathematical renderer for formula blocks based on where the markdown will be viewed (default: katex) |
+| `confluenceSmartPublisher.debug`                 | Enable debug logging of HTTP requests and responses in the Output channel for troubleshooting (default: false) |
 
 ## 📄 .confluence File Structure
-This extension adds a `<csp:parameters>` block to the document, which is used internally by the Confluence Smart Publisher extension, and whose values can be modified.
 
-`<csp:file_id>`: Page ID in Confluence (automatically filled after publication).
+`.confluence` files support **YAML**, **JSON**, and **XML** metadata formats. The metadata block contains page configuration used by the extension.
 
-`<csp:labels_list>`: List of labels separated by commas. Additions and changes will be reflected on the online page.
+**Metadata fields:**
+- `file_id`: Page ID in Confluence (automatically filled after publication)
+- `title`: Page title (used when creating/updating pages)
+- `labels_list`: List of labels separated by commas. Changes are reflected on the online page
+- `parent_id`: Parent page ID in Confluence
+- `properties`: Page properties (key/value pairs)
 
-`<csp:parent_id>`: Parent page ID in Confluence.
+**YAML format** (recommended for readability):
+```yaml
+csp:
+  file_id: "123456"
+  title: "My Page Title"
+  labels_list: user-story,scope,pending
+  parent_id: "654321"
+  properties: []
+content: |
+  <h1>Page content in Confluence Storage Format</h1>
+  <ac:structured-macro ac:name="info">
+    <ac:rich-text-body><p>This is an info panel.</p></ac:rich-text-body>
+  </ac:structured-macro>
+```
 
-`<csp:properties>`: Page properties (key/value). These properties can be changed, deleted, or new ones included. But be careful as changes may cause unexpected effects.
+**JSON format**:
+```json
+{
+  "csp": {
+    "file_id": "123456",
+    "title": "My Page Title",
+    "labels_list": "user-story,scope,pending",
+    "parent_id": "654321",
+    "properties": []
+  },
+  "content": "<h1>Page content in Confluence Storage Format</h1>"
+}
+```
 
-Example:
+**XML format** (legacy):
 ```xml
 <csp:parameters xmlns:csp="https://confluence.smart.publisher/csp">
   <csp:file_id>123456</csp:file_id>
@@ -207,7 +261,7 @@ Example:
 
 ### Core Dependencies
 - [cheerio](https://cheerio.js.org/)
-   - Manipulation and parsing of HTML/XML in jQuery style, facilitating the extraction and modification of elements.
+   - DOM-based HTML/XML parsing and transformation. Used for both Confluence Storage Format preview rendering and content manipulation.
 - [fast-xml-parser](https://github.com/NaturalIntelligence/fast-xml-parser)
    - Fast conversion between XML and JSON, essential for reading and validating .confluence files.
 - [form-data](https://github.com/form-data/form-data)
@@ -222,16 +276,26 @@ Example:
    - Emoji picker used to add emojis to titles.
 
 ### Preview System Dependencies
+
+#### Markdown Preview
 - [markdown-it](https://github.com/markdown-it/markdown-it)
-   - Markdown parser with extensible architecture, used for high-fidelity preview rendering.
+   - Markdown parser with extensible architecture, used for high-fidelity Markdown preview rendering.
 - [markdown-it-admonition](https://github.com/brad-jones/markdown-it-admonition)
    - Plugin for markdown-it that adds support for Material for MkDocs admonition syntax.
 
+#### Confluence Preview
+- [cheerio](https://cheerio.js.org/) — DOM-based parsing and transformation of Confluence Storage Format (`ac:*`, `ri:*` elements)
+- [highlight.js](https://highlightjs.org/) — Syntax highlighting for code blocks extracted from `ac:structured-macro[name=code]`
+- [js-yaml](https://github.com/nodeca/js-yaml) — YAML frontmatter parsing for `.confluence` file metadata
+
 #### Styling and Theming
 - [Material for MkDocs](https://github.com/squidfunk/mkdocs-material) (CSS Assets)
-   - Official Material Design theme for MkDocs, providing authentic styling for the preview system.
+   - Official Material Design theme for MkDocs, providing authentic styling for the Markdown preview system.
    - Version: 9.6.15
    - Files integrated: `main.scss`, `palette.scss`, `_admonition.scss`
+- Custom Confluence CSS (`assets/css/confluence-preview.css`)
+   - Confluence-themed styling with dark/light theme support via VS Code theme auto-detection
+   - Panel macro colors, code block styling, metadata header, table formatting
 
 ## 🚧 Known Issues
 
@@ -260,9 +324,11 @@ Contributions are welcome! Follow the Extension Guidelines to ensure best practi
 
 This extension leverages several excellent open-source projects:
 
-- **[Material for MkDocs](https://github.com/squidfunk/mkdocs-material)** by Martin Donath - For the beautiful Material Design theme and CSS assets that power our preview system
+- **[Material for MkDocs](https://github.com/squidfunk/mkdocs-material)** by Martin Donath - For the beautiful Material Design theme and CSS assets that power our Markdown preview system
 - **[markdown-it](https://github.com/markdown-it/markdown-it)** - For the robust and extensible Markdown parser
 - **[markdown-it-admonition](https://github.com/brad-jones/markdown-it-admonition)** by Brad Jones - For seamless admonition support
+- **[cheerio](https://cheerio.js.org/)** - For robust DOM-based HTML/XML parsing powering the Confluence preview
+- **[highlight.js](https://highlightjs.org/)** - For professional syntax highlighting in code blocks
 - **Atlassian Confluence** - For providing the platform and APIs that make this extension possible
 
 Special thanks to the maintainers and contributors of these projects for their excellent work.
@@ -276,6 +342,8 @@ This extension is distributed under the MIT license. See the LICENSE file for mo
 - **Material for MkDocs**: MIT License - Copyright (c) 2016-2025 Martin Donath
 - **markdown-it**: MIT License - Copyright (c) 2014 Vitaly Puzrin, Alex Kocharin
 - **markdown-it-admonition**: MIT License - Copyright (c) 2020 Brad Jones
+- **cheerio**: MIT License - Copyright (c) 2022 The Cheerio contributors
+- **highlight.js**: BSD 3-Clause License - Copyright (c) 2006 Ivan Sagalaev
 
 ---
 

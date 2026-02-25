@@ -2,6 +2,43 @@
 
 All notable changes to the "confluence-smart-publisher" extension will be documented in this file.
 
+## [0.4.8] - 2026-02-25
+### New Features
+- **🔍 Confluence Storage Format Live Preview**: Added a dedicated preview panel for `.confluence` files that renders Confluence Storage Format content directly in VS Code
+  - Transforms `ac:structured-macro` elements (code blocks, panels, expand sections, status badges) into styled HTML
+  - Parses YAML frontmatter (`csp:` block) and displays page metadata (title, ID, parent, labels)
+  - Uses [cheerio](https://cheerio.js.org/) for robust DOM-based transformation of Confluence's XML-namespaced elements
+  - Syntax highlighting for code macros via [highlight.js](https://highlightjs.org/) with language auto-detection
+  - Supports panel macros (`info`, `note`, `warning`, `tip`, `error`) with Confluence-themed colors and icons
+  - Collapsible `<details>/<summary>` rendering for `ac:structured-macro[name=expand]`
+  - Handles `ac:link`, `ac:image`, `ac:emoticon`, `ac:task-list`, and `ri:*` elements
+  - CDATA placeholder strategy ensures code block content is preserved through cheerio parsing
+  - **Dark/Light theme auto-detection**: Preview automatically adapts to VS Code's active color theme — no manual toggle needed
+  - Singleton panel pattern with 300ms debounced live updates as you edit
+  - Editor title button with light/dark SVG icons for quick access
+  - Keybinding: `Ctrl+Shift+V` (macOS: `Cmd+Shift+V`) when editing `.confluence` files
+  - Context menu entry: right-click any `.confluence` file → "Open Confluence Preview"
+- **🧹 Tidy Content**: New command to prettify XHTML content inside YAML `.confluence` files
+  - Properly indents block-level HTML elements (`<h1>`, `<p>`, `<div>`, `<table>`, `<tr>`, `<td>`, etc.)
+  - Preserves inline elements on the same line as their parent
+  - Handles Confluence Storage Format elements (`ac:structured-macro`, `ac:rich-text-body`, `ac:parameter`, `ac:layout`, etc.)
+  - Protects CDATA sections from modification
+  - Available via right-click context menu → Confluence Smart Publisher → "Tidy Content"
+
+### Enhancement
+- **🔐 Bearer Token Authentication**: Merged `antrusd/sb-auth-bearer-token` — support for Bearer token as alternative to Basic authentication via `confluenceSmartPublisher.useBearerAuth` setting
+- **🖥️ Confluence Server/Data Center Support**: Added `confluenceSmartPublisher.confluenceVersion` dropdown to toggle between Cloud (v2 API) and Server/Data Center (v1 REST API)
+- **🔍 Debug HTTP Logging**: Added `confluenceSmartPublisher.debug` configuration option to log all HTTP requests and responses
+- **📄 YAML & JSON Format Support**: `.confluence` files support both YAML and JSON formats with `confluenceSmartPublisher.confluenceFileFormat` setting
+- **📦 YAML Block Scalar**: Download now uses `content: |-` (literal strip) instead of `content: |` for cleaner content blocks. Parser supports all YAML block scalar types (`|`, `|-`, `|+`, `>`, `>-`, `>+`)
+
+### Technical Improvements
+- New files: `src/preview/ConfluenceRenderer.ts`, `src/preview/ConfluencePreviewPanel.ts`, `assets/css/confluence-preview.css`, `icons/preview-light.svg`, `icons/preview-dark.svg`
+- Added `cheerio` dependency (^1.2.0) for Confluence Storage Format DOM parsing
+- Added `tidyConfluenceContent()` and `prettifyXhtml()` functions to `src/confluenceFormatter.ts`
+- Updated `package.json` with preview command, tidy content command, context menus, keybinding, and editor/title icon
+- Updated `tsconfig.json` to exclude `references/` directory from compilation
+
 ## [0.4.7] - 2026-02-18
 ### Enhancement
 - **📝 Confluence Code Macro for Markdown Conversion**: The "Convert Markdown to Confluence" command now generates `ac:structured-macro` code blocks instead of `<pre><code>` tags

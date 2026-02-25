@@ -101,11 +101,11 @@ export class ConfluenceRenderer {
 
     /**
      * Parses a .confluence file into its YAML metadata and HTML content parts
-     * The format is YAML with a `csp:` block and a `content: |-` field containing HTML
+     * Supports all YAML block scalar types: | (literal), |- (strip), |+ (keep), > (folded), >- (folded strip), >+ (folded keep)
      */
     public parseConfluenceFile(fileContent: string): ConfluenceFile {
         try {
-            // Parse the entire file as YAML
+            // Parse the entire file as YAML — js-yaml natively handles all block scalar types
             const parsed = yaml.load(fileContent) as any;
 
             if (parsed && typeof parsed === 'object') {
@@ -118,8 +118,8 @@ export class ConfluenceRenderer {
             console.warn('[ConfluenceRenderer] YAML parsing failed, trying fallback:', e);
         }
 
-        // Fallback: try to extract content manually
-        const contentMatch = fileContent.match(/^content:\s*\|-\s*\n([\s\S]+)$/m);
+        // Fallback: try to extract content manually (supports all block scalar indicators: |, |-, |+, >, >-, >+)
+        const contentMatch = fileContent.match(/^content:\s*(?:[|>][-+]?)\s*\n([\s\S]+)$/m);
         if (contentMatch) {
             // De-indent the content block
             const content = contentMatch[1].replace(/^  /gm, '');

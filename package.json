@@ -65,6 +65,10 @@
           "light": "./icons/preview-light.svg",
           "dark": "./icons/preview-dark.svg"
         }
+      },
+      {
+        "command": "confluence-smart-publisher.tidyContent",
+        "title": "Tidy Content"
       }
     ],
     "submenus": [
@@ -128,6 +132,10 @@
         },
         {
           "command": "confluence-smart-publisher.previewConfluence",
+          "when": "resourceExtname == .confluence"
+        },
+        {
+          "command": "confluence-smart-publisher.tidyContent",
           "when": "resourceExtname == .confluence"
         }
       ],

@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { publishConfluenceFile, ConfluenceClient, BodyFormat } from './confluenceClient';
 import * as path from 'path';
-import { formatConfluenceDocument, decodeHtmlEntities } from './confluenceFormatter';
+import { formatConfluenceDocument, decodeHtmlEntities, tidyConfluenceContent } from './confluenceFormatter';
 import { getEmojiPickerHtml } from './webview';
 import { MarkdownConverter } from './markdownConverter';
 import { AdfToMarkdownConverter } from './adf-md-converter/adf-to-md-converter';
@@ -519,6 +519,32 @@ ${markdown.trim()}
         }
     });
 
+    // Command to tidy (prettify) XHTML content in YAML .confluence files
+    const tidyContentCmd = vscode.commands.registerCommand('confluence-smart-publisher.tidyContent', async (uri: vscode.Uri) => {
+        if (!uri || !uri.fsPath.endsWith('.confluence')) {
+            vscode.window.showErrorMessage('Select a .confluence file to tidy.');
+            return;
+        }
+        try {
+            const document = await vscode.workspace.openTextDocument(uri);
+            outputChannel.appendLine(`[Tidy] Starting content tidy of file: "${uri.fsPath}"`);
+
+            const editor = await vscode.window.showTextDocument(document, { preview: false });
+            const tidied = tidyConfluenceContent(document.getText());
+            await editor.edit(editBuilder => {
+                const start = new vscode.Position(0, 0);
+                const end = new vscode.Position(document.lineCount, 0);
+                editBuilder.replace(new vscode.Range(start, end), tidied);
+            });
+            outputChannel.appendLine(`[Tidy] Content tidied: "${uri.fsPath}"`);
+            vscode.window.showInformationMessage('Content tidied successfully!');
+        } catch (e: any) {
+            outputChannel.appendLine(`[Tidy] Error tidying: ${e.message || e}`);
+            outputChannel.show(true);
+            vscode.window.showErrorMessage(`Error tidying content: ${e.message || e}`);
+        }
+    });
+
     // Command to open confluence preview
     const previewConfluenceCmd = vscode.commands.registerCommand('confluence-smart-publisher.previewConfluence', () => {
         try {
@@ -545,6 +571,7 @@ ${markdown.trim()}
         convertMarkdownCmd,
         convertConfluenceToMarkdownCmd,
         previewCmd,
-        previewConfluenceCmd
+        previewConfluenceCmd,
+        tidyContentCmd
     );
 }
