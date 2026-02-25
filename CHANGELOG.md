@@ -10,6 +10,11 @@ All notable changes to the "confluence-smart-publisher" extension will be docume
   - Each macro gets a unique UUID for `ac:macro-id`
   - HTML entities inside code content are properly unescaped for CDATA sections
 
+### Bug Fix
+- **🐛 Auto-inject `ac:macro-id` on Publish**: Fixed 500 Internal Server Error when publishing pages containing `<ac:structured-macro>` tags without `ac:macro-id` attribute. The extension now automatically generates a UUID for any macro missing this attribute before sending to Confluence Server.
+- **🐛 Shared Output Channel**: Fixed debug output channel creating duplicate "Confluence Smart Publisher" entries in the Output panel (showing `#2`, `#3`, etc.) on every publish/download operation. `ConfluenceClient` now reuses the extension's single output channel via a static shared reference set during activation.
+- **🐛 Sync with Published on YAML/JSON files**: Fixed "Sync with Published" command always prompting for page ID even when the file has `file_id` in CSP metadata. The command was using a legacy XML-only regex (`<csp:file_id>`) instead of the format-agnostic `extractFileId()` utility that handles JSON, YAML, and XML formats.
+
 ## [0.4.6] - 2026-02-18
 ### Bug Fix
 - **🐛 Non-blocking Label/Property Operations**: Fixed 500 Internal Server Error during publish caused by DELETE label/property operations failing due to insufficient permissions. These operations are now best-effort — failures are logged as `[WARN]` in the Output channel but no longer block the publish workflow.

@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { workspace } from 'vscode';
 import { mkdirSync, writeFileSync, createReadStream, existsSync, readFileSync, promises as fsPromises } from 'fs';
 import { isAbsolute, join, dirname, basename, extname } from 'path';
+import { randomUUID } from 'crypto';
 import FormData = require('form-data');
 import { decodeHtmlEntities } from './confluenceFormatter';
 import { AdfToMarkdownConverter } from './adf-md-converter/adf-to-md-converter';
@@ -37,6 +38,23 @@ export class ConfluenceClient {
     private debugMode: boolean;
     private outputChannel: vscode.OutputChannel;
 
+    private static _sharedOutputChannel: vscode.OutputChannel | undefined;
+
+    /**
+     * Sets the shared output channel for all ConfluenceClient instances.
+     * Call this once from extension activation to reuse the extension's output channel.
+     */
+    static setOutputChannel(channel: vscode.OutputChannel): void {
+        ConfluenceClient._sharedOutputChannel = channel;
+    }
+
+    private static getSharedOutputChannel(): vscode.OutputChannel {
+        if (!ConfluenceClient._sharedOutputChannel) {
+            ConfluenceClient._sharedOutputChannel = vscode.window.createOutputChannel('Confluence Smart Publisher');
+        }
+        return ConfluenceClient._sharedOutputChannel;
+    }
+
     constructor() {
         // Preferencialmente, use as configurações do VSCode para armazenar as credenciais
         const config = workspace.getConfiguration('confluenceSmartPublisher');
@@ -46,7 +64,7 @@ export class ConfluenceClient {
         this.useBearerAuth = config.get('useBearerAuth') as boolean || false;
         this.confluenceVersion = (config.get('confluenceVersion') as string || 'cloud') as 'cloud' | 'server';
         this.debugMode = config.get('debug') as boolean || false;
-        this.outputChannel = vscode.window.createOutputChannel('Confluence Smart Publisher');
+        this.outputChannel = ConfluenceClient.getSharedOutputChannel();
         if (!this.baseUrl || !this.apiToken) {
             throw new Error('Configure baseUrl and apiToken in the extension settings.');
         }
@@ -503,6 +521,20 @@ export class ConfluenceClient {
     }
 
     /**
+     * Ensures all <ac:structured-macro> tags have an ac:macro-id attribute.
+     * Confluence Server rejects content with 500 Internal Server Error if macros lack this attribute.
+     * Generates a random UUID for any macro missing ac:macro-id.
+     */
+    private ensureMacroIds(content: string): string {
+        return content.replace(
+            /<ac:structured-macro\b((?:(?!ac:macro-id)[^>])*)>/g,
+            (_match, attrs: string) => {
+                return `<ac:structured-macro${attrs} ac:macro-id="${randomUUID()}">`;
+            }
+        );
+    }
+
+    /**
      * Detects the format of a .confluence file content.
      * Returns 'json', 'yaml', or 'xml' (legacy).
      */
@@ -555,7 +587,7 @@ export class ConfluenceClient {
         }
 
         // Extract XHTML storage content (handles both JSON and legacy XHTML formats)
-        let contentToSend = this.extractStorageContent(content);
+        let contentToSend = this.ensureMacroIds(this.extractStorageContent(content));
 
         let payload: any;
         let url: string;
@@ -660,7 +692,7 @@ export class ConfluenceClient {
         const pageId = extractFileId(content);
         if (!pageId || !/^\d+$/.test(pageId)) {throw new Error(`Invalid or missing page ID in tag: ${pageId}`);}
         // Extract XHTML storage content (handles both JSON and legacy XHTML formats)
-        let contentToSend = this.extractStorageContent(content);
+        let contentToSend = this.ensureMacroIds(this.extractStorageContent(content));
 
         const pasta = dirname(filePath);
         contentToSend = await this._processImagesInContent(contentToSend, pageId, pasta);

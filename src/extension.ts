@@ -1,6 +1,7 @@
 // The module 'vscode' contains the VS Code extensibility API
 import * as vscode from 'vscode';
 import { registerCommands, registerDiagnostics, registerFormatters, registerCompletionProviders } from './index';
+import { ConfluenceClient } from './confluenceClient';
 
 let outputChannel: vscode.OutputChannel;
 
@@ -8,6 +9,9 @@ let outputChannel: vscode.OutputChannel;
 export function activate(context: vscode.ExtensionContext) {
 	outputChannel = vscode.window.createOutputChannel('Confluence Smart Publisher');
 	context.subscriptions.push(outputChannel);
+
+	// Share the output channel with ConfluenceClient so it doesn't create new ones
+	ConfluenceClient.setOutputChannel(outputChannel);
 	
 	// Exibir mensagem de ativação após toda a configuração
 	outputChannel.appendLine('Confluence Smart Publisher activated!');

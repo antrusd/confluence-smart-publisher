@@ -5,7 +5,7 @@ import { formatConfluenceDocument, decodeHtmlEntities } from './confluenceFormat
 import { getEmojiPickerHtml } from './webview';
 import { MarkdownConverter } from './markdownConverter';
 import { AdfToMarkdownConverter } from './adf-md-converter/adf-to-md-converter';
-import { createXMLCSPBlock, createYAMLCSPBlock } from './csp-utils';
+import { createXMLCSPBlock, createYAMLCSPBlock, extractFileId } from './csp-utils';
 import { PreviewPanel } from './preview/PreviewPanel';
 
 export function registerCommands(context: vscode.ExtensionContext, outputChannel: vscode.OutputChannel) {
@@ -198,10 +198,7 @@ export function registerCommands(context: vscode.ExtensionContext, outputChannel
         let fileId = '';
         try {
             const content = fs.readFileSync(uri.fsPath, 'utf-8');
-            const match = content.match(/<csp:file_id>(\d+)<\/csp:file_id>/);
-            if (match) {
-                fileId = match[1];
-            }
+            fileId = extractFileId(content) || '';
         } catch (e) {}
 
         if (!fileId) {
@@ -261,6 +258,9 @@ export function registerCommands(context: vscode.ExtensionContext, outputChannel
                         detail: 'No changes will be made.'
                     }
                 ], { placeHolder: 'Choose sync action' });
+
+                // Close the diff editor tab after user makes their choice
+                await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
 
                 if (!choice || choice.label === 'Cancel') {
                     outputChannel.appendLine('[Sync] Sync cancelled by user.');
