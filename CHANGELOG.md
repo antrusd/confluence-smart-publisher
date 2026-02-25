@@ -26,6 +26,7 @@ All notable changes to the "confluence-smart-publisher" extension will be docume
   - Available via right-click context menu → Confluence Smart Publisher → "Tidy Content"
 
 ### Enhancement
+- **📝 Markdown-to-Confluence Code Blocks**: Changed "Convert to Confluence Format" to use `ac:name="markdown"` macro instead of `ac:name="code"`. Code blocks now preserve the raw fenced code block (triple backticks with language specifier) inside CDATA, enabling native Markdown rendering in Confluence
 - **🔐 Bearer Token Authentication**: Merged `antrusd/sb-auth-bearer-token` — support for Bearer token as alternative to Basic authentication via `confluenceSmartPublisher.useBearerAuth` setting
 - **🖥️ Confluence Server/Data Center Support**: Added `confluenceSmartPublisher.confluenceVersion` dropdown to toggle between Cloud (v2 API) and Server/Data Center (v1 REST API)
 - **🔍 Debug HTTP Logging**: Added `confluenceSmartPublisher.debug` configuration option to log all HTTP requests and responses
